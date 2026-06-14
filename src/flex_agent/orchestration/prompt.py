@@ -17,7 +17,7 @@ ORCHESTRATOR_PROMPT = """你是 flex-agent 主编排器，负责自主完成 VR/
 - `corpus/queue.json`：待编码 id
 - `corpus/partition.json`：Alice/Kevin 划分
 - `coding/{id}.json`：Bob 单条编码结果
-- `codebook/constructs.json`：当前代码本
+- `codebook/dimensions.json`：当前代码本
 - `codebook/batches/{n}.json`：Kevin 批次快照
 - `quality/warnings.json`：质量告警
 - `exports/open_coding_result_*.json`：最终导出
@@ -26,7 +26,7 @@ ORCHESTRATOR_PROMPT = """你是 flex-agent 主编排器，负责自主完成 VR/
 
 1. `init_open_coding_run`：从原始 jsonl（如 `/corpus/codebook_done.jsonl`）加载、采样、初始化 corpus 与 partition
 2. `batch_bob_code`：并发编码全部文本，写入 `coding/`
-3. `run_alice_codebook`：基于 codebook 子样本生成初始 constructs
+3. `run_alice_codebook`：基于 codebook 子样本生成初始 dimensions
 4. `run_kevin_batches`：按批更新代码本
 5. `export_result`：导出评估兼容结果
 

@@ -7,7 +7,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
-from flex_agent.models import ConstructDetail, FinishedItemDetail, FinishedTextItem
+from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 
 
 POLARITY_RE = re.compile(r"^\s*([^:：]+?)\s*[:：]\s*([+-]1)\s*$")
@@ -354,22 +354,22 @@ def extract_item_pool(finished_texts: Iterable[FinishedTextItem]) -> list[str]:
     return sorted(item_names)
 
 
-def merge_new_items_into_constructs(
-    constructs: Sequence[ConstructDetail],
+def merge_new_items_into_dimensions(
+    dimensions: Sequence[DimensionDetail],
     new_items: Sequence[str],
-    new_constructs: Sequence[ConstructDetail] | None = None,
-) -> tuple[list[ConstructDetail], QualityWarnings]:
-    max_new_constructs_per_merge = 1
-    min_items_for_new_construct = 2
+    new_dimensions: Sequence[DimensionDetail] | None = None,
+) -> tuple[list[DimensionDetail], QualityWarnings]:
+    max_new_dimensions_per_merge = 1
+    min_items_for_new_dimension = 2
     warnings = QualityWarnings()
-    merged = copy.deepcopy(list(constructs))
+    merged = copy.deepcopy(list(dimensions))
     if not merged:
-        warnings.notes.append("merge skipped because there are no existing constructs")
+        warnings.notes.append("merge skipped because there are no existing dimensions")
 
-    index: dict[str, ConstructDetail] = {}
-    for construct in merged:
+    index: dict[str, DimensionDetail] = {}
+    for dimension in merged:
         unique_items: list[str] = []
-        for item in construct.items:
+        for item in dimension.items:
             normalized = COMMON_LABEL_ALIASES.get(item.strip(), item.strip())
             if not normalized:
                 continue
@@ -377,86 +377,86 @@ def merge_new_items_into_constructs(
                 warnings.duplicate_items += 1
                 continue
             unique_items.append(normalized)
-            index[normalized] = construct
-        construct.items = unique_items
+            index[normalized] = dimension
+        dimension.items = unique_items
 
-    construct_name_index = {construct.name.strip(): construct for construct in merged if construct.name.strip()}
-    created_new_constructs = 0
-    if new_constructs:
-        for proposal in new_constructs:
+    dimension_name_index = {dimension.name.strip(): dimension for dimension in merged if dimension.name.strip()}
+    created_new_dimensions = 0
+    if new_dimensions:
+        for proposal in new_dimensions:
             proposal_name = proposal.name.strip()
             if not proposal_name:
                 continue
-            target_construct = construct_name_index.get(proposal_name)
-            if target_construct is None:
+            target_dimension = dimension_name_index.get(proposal_name)
+            if target_dimension is None:
                 proposed_items = [
                     COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
                     for raw_item in proposal.items
                     if COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
                 ]
                 unique_proposed_items = list(dict.fromkeys(proposed_items))
-                if len(unique_proposed_items) < min_items_for_new_construct:
+                if len(unique_proposed_items) < min_items_for_new_dimension:
                     warnings.notes.append(
-                        "skip sparse new construct proposal with fewer than 2 unique items"
+                        "skip sparse new dimension proposal with fewer than 2 unique items"
                     )
                     new_items = list(new_items) + unique_proposed_items
                     continue
-                if created_new_constructs >= max_new_constructs_per_merge:
+                if created_new_dimensions >= max_new_dimensions_per_merge:
                     warnings.notes.append(
-                        "skip new construct proposals above max_new_constructs_per_merge=1"
+                        "skip new dimension proposals above max_new_dimensions_per_merge=1"
                     )
                     new_items = list(new_items) + unique_proposed_items
                     continue
-                target_construct = ConstructDetail(
+                target_dimension = DimensionDetail(
                     name=proposal_name,
                     items=[],
                     definition=proposal.definition,
                 )
-                merged.append(target_construct)
-                construct_name_index[proposal_name] = target_construct
-                created_new_constructs += 1
-            elif not target_construct.definition and proposal.definition:
-                target_construct.definition = proposal.definition
+                merged.append(target_dimension)
+                dimension_name_index[proposal_name] = target_dimension
+                created_new_dimensions += 1
+            elif not target_dimension.definition and proposal.definition:
+                target_dimension.definition = proposal.definition
 
             for raw_item in proposal.items:
-                dimension = COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
-                if not dimension:
+                item_label = COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
+                if not item_label:
                     continue
-                if dimension in index:
+                if item_label in index:
                     continue
-                target_construct.items.append(dimension)
-                index[dimension] = target_construct
+                target_dimension.items.append(item_label)
+                index[item_label] = target_dimension
 
     skipped_items: list[str] = []
     for raw_item in new_items:
-        dimension = COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
-        if not dimension:
+        item_label = COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
+        if not item_label:
             continue
-        if dimension in index:
+        if item_label in index:
             continue
-        skipped_items.append(dimension)
+        skipped_items.append(item_label)
 
     if skipped_items:
         unique_skipped_items = list(dict.fromkeys(skipped_items))
         warnings.notes.append(
-            "unassigned items skipped instead of adding fallback construct: "
+            "unassigned items skipped instead of adding fallback dimension: "
             + ", ".join(unique_skipped_items)
         )
 
     return merged, warnings
 
 
-def review_constructs(
-    constructs: Sequence[ConstructDetail],
+def review_dimensions(
+    dimensions: Sequence[DimensionDetail],
     finished_texts: Sequence[FinishedTextItem] | None = None,
-) -> tuple[list[ConstructDetail], QualityWarnings]:
+) -> tuple[list[DimensionDetail], QualityWarnings]:
     warnings = QualityWarnings()
-    reviewed: list[ConstructDetail] = []
+    reviewed: list[DimensionDetail] = []
     used_items: set[str] = set()
     used_names: Counter[str] = Counter()
 
-    for construct in constructs:
-        name = construct.name.strip()
+    for dimension in dimensions:
+        name = dimension.name.strip()
         if not name:
             continue
         used_names[name] += 1
@@ -465,7 +465,7 @@ def review_constructs(
             name = f"{name}{used_names[name]}"
 
         unique_items: list[str] = []
-        for raw_item in construct.items:
+        for raw_item in dimension.items:
             item = COMMON_LABEL_ALIASES.get(raw_item.strip(), raw_item.strip())
             if not item:
                 continue
@@ -476,10 +476,10 @@ def review_constructs(
             unique_items.append(item)
         if unique_items:
             reviewed.append(
-                ConstructDetail(
+                DimensionDetail(
                     name=name,
                     items=unique_items,
-                    definition=construct.definition,
+                    definition=dimension.definition,
                 )
             )
 
@@ -487,7 +487,7 @@ def review_constructs(
         missing_items = [item for item in extract_item_pool(finished_texts) if item not in used_items]
         if missing_items:
             warnings.notes.append(
-                "construct review found uncovered items: " + ", ".join(missing_items)
+                "dimension review found uncovered items: " + ", ".join(missing_items)
             )
 
     return reviewed, warnings

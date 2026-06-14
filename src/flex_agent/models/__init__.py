@@ -45,7 +45,7 @@ class FinishedTextItem(BaseModel):
     items: List[FinishedItemDetail] = Field(default_factory=list)
 
 
-class ConstructDetail(BaseModel):
+class DimensionDetail(BaseModel):
     name: str
     items: List[str] = Field(default_factory=list)
     definition: str | None = None
@@ -70,5 +70,5 @@ class PartitionMeta(BaseModel):
 class WorkspaceSnapshot(BaseModel):
     unfinished_texts: List[TextItem] = Field(default_factory=list)
     finished_texts: List[FinishedTextItem] = Field(default_factory=list)
-    constructs: List[ConstructDetail] = Field(default_factory=list)
+    dimensions: List[DimensionDetail] = Field(default_factory=list)
     quality_warnings: dict[str, Any] = Field(default_factory=dict)

@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from flex_agent.config import PROJECT_ROOT
-from flex_agent.models import ConstructDetail, TextItem
+from flex_agent.models import DimensionDetail, TextItem
 
 
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
@@ -114,26 +114,26 @@ class BobOutput(BaseModel):
     items: List[BobItemDetail] = Field(default_factory=list)
 
 
-class AliceConstructDetail(BaseModel):
-    name: str = Field(description="构念名称。")
-    items: List[str] = Field(description="属于该构念的规范化中文条目标签，必须来自 items_pool。")
-    definition: str = Field(description="用一句简洁的中文定义该构念的边界。")
+class AliceDimensionDetail(BaseModel):
+    name: str = Field(description="维度名称。")
+    items: List[str] = Field(description="属于该维度的规范化中文条目标签，必须来自 items_pool。")
+    definition: str = Field(description="用一句简洁的中文定义该维度的边界。")
 
 
 class AliceOutput(BaseModel):
-    constructs: List[AliceConstructDetail] = Field(default_factory=list)
+    dimensions: List[AliceDimensionDetail] = Field(default_factory=list)
 
 
-class KevinConstructDetail(BaseModel):
-    name: str = Field(description="构念名称。")
+class KevinDimensionDetail(BaseModel):
+    name: str = Field(description="维度名称。")
     items: List[str] = Field(
-        description="属于该构念的规范化中文条目标签，必须来自传入的 items_pool 或已有构念。"
+        description="属于该维度的规范化中文条目标签，必须来自传入的 items_pool 或已有维度。"
     )
-    definition: str = Field(description="用一句简洁的中文定义该构念的边界。")
+    definition: str = Field(description="用一句简洁的中文定义该维度的边界。")
 
 
 class KevinOutput(BaseModel):
-    constructs: List[KevinConstructDetail] = Field(default_factory=list)
+    dimensions: List[KevinDimensionDetail] = Field(default_factory=list)
 
 
 ItemDetailInput = list[dict[str, Any]]
@@ -143,15 +143,15 @@ def _json_prompt_value(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
-def _format_constructs_json(existing_constructs: list[ConstructDetail]) -> str:
+def _format_dimensions_json(existing_dimensions: list[DimensionDetail]) -> str:
     return _json_prompt_value(
         [
             {
-                "name": construct.name,
-                "items": list(construct.items),
-                "definition": construct.definition,
+                "name": dimension.name,
+                "items": list(dimension.items),
+                "definition": dimension.definition,
             }
-            for construct in existing_constructs
+            for dimension in existing_dimensions
         ]
     )
 
@@ -200,26 +200,26 @@ async def arun_alice(
 async def arun_kevin(
     llm: BaseChatModel,
     prompt_ctx: PromptContext,
-    existing_constructs: List[ConstructDetail],
+    existing_dimensions: List[DimensionDetail],
     items_pool: List[str],
     items_details: ItemDetailInput | None = None,
 ) -> KevinOutput:
     if items_details:
         human_content = (
-            "current_constructs JSON:\n{current_constructs}\n\n"
+            "current_dimensions JSON:\n{current_dimensions}\n\n"
             "items_details JSON:\n{items_details}"
         )
         payload = {
-            "current_constructs": _format_constructs_json(existing_constructs),
+            "current_dimensions": _format_dimensions_json(existing_dimensions),
             "items_details": _json_prompt_value(items_details),
         }
     else:
         human_content = (
-            "current_constructs JSON:\n{current_constructs}\n\n"
+            "current_dimensions JSON:\n{current_dimensions}\n\n"
             "items_pool JSON:\n{items_pool}"
         )
         payload = {
-            "current_constructs": _format_constructs_json(existing_constructs),
+            "current_dimensions": _format_dimensions_json(existing_dimensions),
             "items_pool": _json_prompt_value(list(items_pool)),
         }
 

@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from flex_agent.models import (
-    ConstructDetail,
+    DimensionDetail,
     FinishedTextItem,
     PartitionMeta,
     RunMeta,
@@ -148,20 +148,23 @@ class Workspace:
                 finished.append(item)
         return finished
 
-    def load_constructs(self) -> list[ConstructDetail]:
-        raw = self._read_json(self.codebook_dir / "constructs.json", [])
-        return [ConstructDetail.model_validate(item) for item in raw]
+    def load_dimensions(self) -> list[DimensionDetail]:
+        dimensions_path = self.codebook_dir / "dimensions.json"
+        legacy_path = self.codebook_dir / "constructs.json"
+        path = dimensions_path if dimensions_path.exists() else legacy_path
+        raw = self._read_json(path, [])
+        return [DimensionDetail.model_validate(item) for item in raw]
 
-    def save_constructs(self, constructs: list[ConstructDetail]) -> None:
+    def save_dimensions(self, dimensions: list[DimensionDetail]) -> None:
         self._write_json(
-            self.codebook_dir / "constructs.json",
-            [item.model_dump() for item in constructs],
+            self.codebook_dir / "dimensions.json",
+            [item.model_dump() for item in dimensions],
         )
 
-    def save_codebook_batch(self, batch_index: int, constructs: list[ConstructDetail]) -> None:
+    def save_codebook_batch(self, batch_index: int, dimensions: list[DimensionDetail]) -> None:
         self._write_json(
             self.codebook_batches_dir / f"{batch_index}.json",
-            [item.model_dump() for item in constructs],
+            [item.model_dump() for item in dimensions],
         )
 
     def load_warnings(self) -> dict:
@@ -217,7 +220,7 @@ class Workspace:
             PartitionMeta(codebook_text_ids=codebook_ids, kevin_text_ids=kevin_ids)
         )
         self.save_queue([text.id for text in texts])
-        self.save_constructs([])
+        self.save_dimensions([])
         self._write_json(self.quality_dir / "warnings.json", {})
         return meta
 
@@ -225,7 +228,7 @@ class Workspace:
         meta = self.load_run_meta()
         partition = self.load_partition()
         coded_ids = self.list_coded_ids()
-        constructs = self.load_constructs()
+        dimensions = self.load_dimensions()
         return {
             "workspace": str(self.root),
             "run": meta.model_dump() if meta else None,
@@ -234,7 +237,7 @@ class Workspace:
             "queue_remaining": len(self.load_queue()),
             "codebook_text_ids": partition.codebook_text_ids,
             "kevin_text_ids": partition.kevin_text_ids,
-            "constructs_count": len(constructs),
+            "dimensions_count": len(dimensions),
             "warnings": self.load_warnings(),
         }
 

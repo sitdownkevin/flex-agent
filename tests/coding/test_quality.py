@@ -7,12 +7,12 @@ from flex_agent.coding.quality import (
     extract_item_details,
     extract_item_pool,
     item_dimension,
-    merge_new_items_into_constructs,
+    merge_new_items_into_dimensions,
     normalize_finished_text,
     parse_labels,
-    review_constructs,
+    review_dimensions,
 )
-from flex_agent.models import ConstructDetail, FinishedItemDetail, FinishedTextItem
+from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 
 
 class OpenCodingQualityTests(unittest.TestCase):
@@ -104,36 +104,36 @@ class OpenCodingQualityTests(unittest.TestCase):
         self.assertEqual(normalized.content_with_labels, "<p>老板人很好</p>，<p>游戏种类多</p>")
         self.assertEqual(warnings.invalid_markup, 2)
 
-    def test_merge_new_items_does_not_append_unassigned_items_to_existing_constructs(self) -> None:
-        constructs = [
-            ConstructDetail(name="服务互动", items=["态度", "专业度"]),
-            ConstructDetail(name="游玩体验", items=["趣味性"]),
+    def test_merge_new_items_does_not_append_unassigned_items_to_existing_dimensions(self) -> None:
+        dimensions = [
+            DimensionDetail(name="服务互动", items=["态度", "专业度"]),
+            DimensionDetail(name="游玩体验", items=["趣味性"]),
         ]
 
-        merged, warnings = merge_new_items_into_constructs(constructs, ["服务态度", "创新性"])
+        merged, warnings = merge_new_items_into_dimensions(dimensions, ["服务态度", "创新性"])
 
         self.assertEqual(merged[0].items, ["态度", "专业度"])
         self.assertEqual(merged[1].items, ["趣味性"])
         self.assertTrue(any("unassigned items skipped" in note for note in warnings.notes))
         self.assertTrue(any("创新性" in note for note in warnings.notes))
 
-    def test_merge_new_items_supports_new_constructs_without_unassigned_fallback(self) -> None:
-        constructs = [
-            ConstructDetail(name="服务互动", items=["态度"]),
-            ConstructDetail(name="游玩体验", items=["趣味性"]),
+    def test_merge_new_items_supports_new_dimensions_without_unassigned_fallback(self) -> None:
+        dimensions = [
+            DimensionDetail(name="服务互动", items=["态度"]),
+            DimensionDetail(name="游玩体验", items=["趣味性"]),
         ]
-        new_constructs = [
-            ConstructDetail(
+        new_dimensions = [
+            DimensionDetail(
                 name="情绪疗愈价值",
                 items=["解压感", "陪伴感"],
                 definition="体验带来的情绪释放与心理修复价值。",
             )
         ]
 
-        merged, warnings = merge_new_items_into_constructs(
-            constructs,
+        merged, warnings = merge_new_items_into_dimensions(
+            dimensions,
             ["解压感", "新鲜感"],
-            new_constructs=new_constructs,
+            new_dimensions=new_dimensions,
         )
 
         self.assertEqual(merged[2].name, "情绪疗愈价值")
@@ -142,76 +142,76 @@ class OpenCodingQualityTests(unittest.TestCase):
         self.assertTrue(any("unassigned items skipped" in note for note in warnings.notes))
         self.assertTrue(any("创新性" in note for note in warnings.notes))
 
-    def test_merge_new_items_limits_new_construct_proposals(self) -> None:
-        constructs = [
-            ConstructDetail(name="服务互动", items=["态度"]),
-            ConstructDetail(name="游玩体验", items=["趣味性"]),
+    def test_merge_new_items_limits_new_dimension_proposals(self) -> None:
+        dimensions = [
+            DimensionDetail(name="服务互动", items=["态度"]),
+            DimensionDetail(name="游玩体验", items=["趣味性"]),
         ]
-        new_constructs = [
-            ConstructDetail(
+        new_dimensions = [
+            DimensionDetail(
                 name="情绪疗愈价值",
                 items=["解压感", "陪伴感"],
                 definition="体验带来的情绪支持与释放价值。",
             ),
-            ConstructDetail(
+            DimensionDetail(
                 name="环境适配价值",
                 items=["空间感", "私密性"],
                 definition="场地与空间配置带来的适配性价值。",
             ),
-            ConstructDetail(
-                name="稀疏构念",
+            DimensionDetail(
+                name="稀疏维度",
                 items=["单一条目"],
-                definition="只有一个条目的稀疏构念。",
+                definition="只有一个条目的稀疏维度。",
             ),
         ]
 
-        merged, warnings = merge_new_items_into_constructs(
-            constructs,
+        merged, warnings = merge_new_items_into_dimensions(
+            dimensions,
             [],
-            new_constructs=new_constructs,
+            new_dimensions=new_dimensions,
         )
 
-        self.assertEqual([construct.name for construct in merged], ["服务互动", "游玩体验", "情绪疗愈价值"])
+        self.assertEqual([dimension.name for dimension in merged], ["服务互动", "游玩体验", "情绪疗愈价值"])
         self.assertEqual(merged[2].items, ["解压感", "陪伴感"])
         self.assertNotIn("空间感", merged[-1].items)
         self.assertNotIn("私密性", merged[-1].items)
         self.assertNotIn("单一条目", merged[-1].items)
-        self.assertTrue(any("max_new_constructs_per_merge" in note for note in warnings.notes))
+        self.assertTrue(any("max_new_dimensions_per_merge" in note for note in warnings.notes))
         self.assertTrue(any("fewer than 2 unique items" in note for note in warnings.notes))
         self.assertTrue(any("unassigned items skipped" in note for note in warnings.notes))
 
-    def test_merge_new_items_with_empty_constructs_does_not_create_fallback(self) -> None:
-        merged, warnings = merge_new_items_into_constructs([], ["态度", "趣味性"])
+    def test_merge_new_items_with_empty_dimensions_does_not_create_fallback(self) -> None:
+        merged, warnings = merge_new_items_into_dimensions([], ["态度", "趣味性"])
 
         self.assertEqual(merged, [])
-        self.assertTrue(any("no existing constructs" in note for note in warnings.notes))
+        self.assertTrue(any("no existing dimensions" in note for note in warnings.notes))
         self.assertTrue(any("unassigned items skipped" in note for note in warnings.notes))
 
-    def test_review_constructs_deduplicates_items(self) -> None:
-        constructs = [
-            ConstructDetail(name="服务互动", items=["态度", "服务态度"]),
-            ConstructDetail(name="设施体验", items=["物理舒适度", "身体舒适度"]),
+    def test_review_dimensions_deduplicates_items(self) -> None:
+        dimensions = [
+            DimensionDetail(name="服务互动", items=["态度", "服务态度"]),
+            DimensionDetail(name="设施体验", items=["物理舒适度", "身体舒适度"]),
         ]
 
-        reviewed, warnings = review_constructs(constructs)
+        reviewed, warnings = review_dimensions(dimensions)
 
         self.assertEqual(reviewed[0].items, ["态度"])
         self.assertEqual(reviewed[1].items, ["物理舒适度"])
         self.assertGreaterEqual(warnings.duplicate_items, 2)
 
-    def test_review_constructs_preserves_construct_count(self) -> None:
-        constructs = [
-            ConstructDetail(name=f"构念{i}", items=[f"条目{i}"])
+    def test_review_dimensions_preserves_dimension_count(self) -> None:
+        dimensions = [
+            DimensionDetail(name=f"维度{i}", items=[f"条目{i}"])
             for i in range(12)
         ]
 
-        reviewed, _ = review_constructs(constructs)
+        reviewed, _ = review_dimensions(dimensions)
 
         self.assertEqual(len(reviewed), 12)
 
-    def test_review_constructs_records_uncovered_items_without_fallback(self) -> None:
-        constructs = [
-            ConstructDetail(name="服务互动", items=["态度"]),
+    def test_review_dimensions_records_uncovered_items_without_fallback(self) -> None:
+        dimensions = [
+            DimensionDetail(name="服务互动", items=["态度"]),
         ]
         finished = [
             FinishedTextItem(
@@ -225,7 +225,7 @@ class OpenCodingQualityTests(unittest.TestCase):
             )
         ]
 
-        reviewed, warnings = review_constructs(constructs, finished)
+        reviewed, warnings = review_dimensions(dimensions, finished)
 
         self.assertEqual(len(reviewed), 1)
         self.assertEqual(reviewed[0].name, "服务互动")

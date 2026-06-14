@@ -14,7 +14,7 @@
 
 ## 输入
 
-- `current_constructs`：JSON 数组。每个对象包含 `name`、`items`、`definition`，表示当前完整代码本。
+- `current_dimensions`：JSON 数组。每个对象包含 `name`、`items`、`definition`，表示当前完整代码本。
 - `items_details`：JSON 数组。每个对象包含 `label` 与 `reasons`，表示当前批次中文条目标签及其提取原因/定义。
 - `items_pool`：当没有 `items_details` 时，你会收到一个 JSON 字符串数组，数组元素是当前批次中文条目标签。
 
@@ -43,13 +43,13 @@
 
 只返回结构化输出：
 
-- `constructs`：对象列表，每个对象包含：
+- `dimensions`：对象列表，每个对象包含：
   - `name`：维度名称
   - `items`：该维度下的中文条目列表
   - `definition`：一句中文边界定义
 
 注意：
-- 输出的 `constructs` 必须是完整更新版代码本。
+- 输出的 `dimensions` 必须是完整更新版代码本。
 - 输出必须保留并包含原有维度及其原有条目。
 - 只在必要时进行最小增量扩展。
 

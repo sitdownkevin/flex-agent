@@ -15,13 +15,13 @@ def export_open_coding_result(workspace: Workspace) -> Path:
     texts = workspace.load_texts()
     coded_ids = set(workspace.list_coded_ids())
     finished = workspace.load_finished_texts()
-    constructs = workspace.load_constructs()
+    dimensions = workspace.load_dimensions()
     warnings = workspace.load_warnings()
 
     snapshot = WorkspaceSnapshot(
         unfinished_texts=[text for text in texts if text.id not in coded_ids],
         finished_texts=finished,
-        constructs=constructs,
+        dimensions=dimensions,
         quality_warnings=warnings,
     )
 
@@ -37,7 +37,7 @@ def export_open_coding_result(workspace: Workspace) -> Path:
             "random_seed": meta.random_seed,
             "debug_dir": None,
             "finished_texts": len(finished),
-            "constructs": len(constructs),
+            "dimensions": len(dimensions),
             "quality_warnings": warnings,
         },
         "state": snapshot.model_dump(),

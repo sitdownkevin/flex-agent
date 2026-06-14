@@ -128,7 +128,7 @@ class StreamEventParser:
 
         raw_todos = chunk.get("todos")
         if isinstance(raw_todos, list):
-            self.todos = [
+            next_todos = [
                 TodoItem(
                     content=str(item.get("content", "")),
                     status=item.get("status", "pending"),
@@ -136,7 +136,11 @@ class StreamEventParser:
                 for item in raw_todos
                 if isinstance(item, dict) and item.get("content")
             ]
-            update.todos = list(self.todos)
+            next_key = tuple((item.content, item.status) for item in next_todos)
+            prev_key = tuple((item.content, item.status) for item in self.todos)
+            self.todos = next_todos
+            if next_key != prev_key:
+                update.todos = list(self.todos)
 
         update.steps = dict(self.steps)
         return update

@@ -6,10 +6,10 @@ from flex_agent.coding.quality import (
     extract_item_details,
     extract_item_pool,
     item_dimension,
-    merge_new_items_into_constructs,
+    merge_new_items_into_dimensions,
     normalize_finished_text,
     parse_labels,
-    review_constructs,
+    review_dimensions,
 )
 
 __all__ = [
@@ -23,8 +23,8 @@ __all__ = [
     "extract_item_details",
     "extract_item_pool",
     "item_dimension",
-    "merge_new_items_into_constructs",
+    "merge_new_items_into_dimensions",
     "normalize_finished_text",
     "parse_labels",
-    "review_constructs",
+    "review_dimensions",
 ]

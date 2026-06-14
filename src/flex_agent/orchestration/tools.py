@@ -13,10 +13,10 @@ from flex_agent.coding.quality import (
     extract_item_details,
     extract_item_pool,
     normalize_finished_text,
-    review_constructs,
+    review_dimensions,
 )
 from flex_agent.config import build_llm, load_model_config
-from flex_agent.models import ConstructDetail, FinishedItemDetail, FinishedTextItem
+from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 from flex_agent.workspace import Workspace
 
 
@@ -166,7 +166,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         ]
         items_pool = extract_item_pool(finished)
         if not items_pool:
-            ctx.workspace.save_constructs([])
+            ctx.workspace.save_dimensions([])
             return "Alice skipped: empty item pool."
 
         items_details = extract_item_details(finished)
@@ -181,20 +181,20 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
             return _tool_error("run_alice_codebook", exc)
 
         candidate = [
-            ConstructDetail(name=item.name, items=list(item.items), definition=item.definition)
-            for item in alice_output.constructs
+            DimensionDetail(name=item.name, items=list(item.items), definition=item.definition)
+            for item in alice_output.dimensions
             if item.items
         ]
         if not candidate:
             return _tool_error(
                 "run_alice_codebook",
-                RuntimeError("Alice returned no non-empty constructs."),
+                RuntimeError("Alice returned no non-empty dimensions."),
             )
 
-        reviewed, review_warnings = review_constructs(candidate, finished)
-        ctx.workspace.save_constructs(reviewed)
+        reviewed, review_warnings = review_dimensions(candidate, finished)
+        ctx.workspace.save_dimensions(reviewed)
         ctx.workspace.merge_warnings(review_warnings.as_dict())
-        return f"Alice wrote {len(reviewed)} constructs to codebook/constructs.json."
+        return f"Alice wrote {len(reviewed)} dimensions to codebook/dimensions.json."
 
     async def run_kevin_batches(batch_index: int | None = None) -> str:
         meta = ctx.workspace.load_run_meta()
@@ -218,7 +218,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         else:
             start_idx = 1
 
-        current = ctx.workspace.load_constructs()
+        current = ctx.workspace.load_dimensions()
         node_warnings = QualityWarnings()
         processed = 0
 
@@ -241,27 +241,27 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 continue
 
             candidate = [
-                ConstructDetail(name=item.name, items=list(item.items), definition=item.definition)
-                for item in output.constructs
+                DimensionDetail(name=item.name, items=list(item.items), definition=item.definition)
+                for item in output.dimensions
                 if item.items
             ]
-            reviewed, warnings = review_constructs(candidate, finished_texts=None)
+            reviewed, warnings = review_dimensions(candidate, finished_texts=None)
             node_warnings.add(warnings)
             if reviewed:
                 current = reviewed
-                ctx.workspace.save_constructs(current)
+                ctx.workspace.save_dimensions(current)
                 ctx.workspace.save_codebook_batch(offset, current)
                 processed += 1
 
-        final_reviewed, final_warnings = review_constructs(
+        final_reviewed, final_warnings = review_dimensions(
             current,
             ctx.workspace.load_finished_texts(),
         )
         node_warnings.add(final_warnings)
-        ctx.workspace.save_constructs(final_reviewed)
+        ctx.workspace.save_dimensions(final_reviewed)
         ctx.workspace.merge_warnings(node_warnings.as_dict())
         ctx.workspace.save_queue([])
-        return f"Kevin processed {processed} batch(es); constructs={len(final_reviewed)}."
+        return f"Kevin processed {processed} batch(es); dimensions={len(final_reviewed)}."
 
     async def export_result() -> str:
         meta = ctx.workspace.load_run_meta()
@@ -291,7 +291,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         StructuredTool.from_function(
             coroutine=run_alice_codebook,
             name="run_alice_codebook",
-            description="Build initial constructs from codebook sample and write codebook/constructs.json.",
+            description="Build initial dimensions from codebook sample and write codebook/dimensions.json.",
         ),
         StructuredTool.from_function(
             coroutine=run_kevin_batches,

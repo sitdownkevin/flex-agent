@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flex_agent.coding.export import export_open_coding_result
 from flex_agent.coding.quality import normalize_finished_text
-from flex_agent.models import ConstructDetail, FinishedItemDetail, FinishedTextItem, RunMeta
+from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem, RunMeta
 from flex_agent.workspace import Workspace, load_comments_from_jsonl
 
 
@@ -116,7 +116,7 @@ class WorkspaceTests(unittest.TestCase):
             self.assertTrue(extra_corpus.exists())
             self.assertFalse((ws.meta_dir / "run.json").exists())
             self.assertEqual(ws.list_coded_ids(), [])
-            self.assertEqual(ws.load_constructs(), [])
+            self.assertEqual(ws.load_dimensions(), [])
             self.assertEqual(ws.load_warnings(), {})
             self.assertFalse(any(ws.exports_dir.glob("*.json")))
             ws.ensure_layout()
@@ -143,6 +143,22 @@ class WorkspaceTests(unittest.TestCase):
             )
             self.assertEqual(meta.max_nums, 1)
             self.assertEqual(len(ws.load_texts()), 1)
+
+    def test_load_dimensions_falls_back_to_legacy_constructs_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Workspace(Path(tmp))
+            ws.ensure_layout()
+            legacy = ws.codebook_dir / "constructs.json"
+            legacy.write_text(
+                json.dumps(
+                    [{"name": "体验", "items": ["趣味性"], "definition": "游戏乐趣"}],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            loaded = ws.load_dimensions()
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0].name, "体验")
 
     def test_save_and_load_coding(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -194,16 +210,17 @@ class ExportTests(unittest.TestCase):
                     ],
                 )
             )
-            ws.save_constructs(
-                [ConstructDetail(name="体验", items=["趣味性"], definition="游戏乐趣")]
+            ws.save_dimensions(
+                [DimensionDetail(name="体验", items=["趣味性"], definition="游戏乐趣")]
             )
             output = export_open_coding_result(ws)
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertIn("meta", payload)
             self.assertIn("state", payload)
             self.assertEqual(payload["meta"]["finished_texts"], 1)
-            self.assertEqual(payload["meta"]["constructs"], 1)
+            self.assertEqual(payload["meta"]["dimensions"], 1)
             self.assertEqual(len(payload["state"]["finished_texts"]), 1)
+            self.assertEqual(len(payload["state"]["dimensions"]), 1)
 
 
 class QualitySmokeTests(unittest.TestCase):

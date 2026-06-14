@@ -1,6 +1,6 @@
 # flex-agent
 
-基于 [deepagents](https://github.com/langchain-ai/deepagents) 的开放式编码 Agent。编码结果持久化到本地 workspace 文件，不再使用 LangGraph State 存储编码内容。
+基于 [deepagents](https://github.com/langchain-ai/deepagents) 的扎根理论编码 Agent。编码结果持久化到本地 workspace 文件，不再使用 LangGraph State 存储编码内容。
 
 ## 特性
 
@@ -40,7 +40,7 @@ workspace/
 ├── corpus/queue.json
 ├── corpus/partition.json
 ├── coding/{id}.json
-├── codebook/constructs.json
+├── codebook/dimensions.json
 ├── codebook/batches/{n}.json
 ├── quality/warnings.json
 └── exports/open_coding_result_*.json
