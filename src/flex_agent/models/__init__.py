@@ -60,6 +60,15 @@ class RunMeta(BaseModel):
     sample_mode: str = "sequential"
     random_seed: int | None = None
     concurrency_limit: int = 10
+    prompts_dir: str | None = None
+    workspace_dir: str | None = None
+
+
+class SessionMeta(BaseModel):
+    prompts_dir: str
+    workspace_dir: str
+    prompts_resolved: str
+    workspace_resolved: str
 
 
 class PartitionMeta(BaseModel):

@@ -12,16 +12,10 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from flex_agent.config import PROJECT_ROOT
 from flex_agent.models import DimensionDetail, TextItem
+from flex_agent.prompts.loader import read_prompt_file
 
-
-PROMPTS_DIR = PROJECT_ROOT / "prompts"
 ModelT = TypeVar("ModelT", bound=BaseModel)
-
-
-def _read_prompt_file(filename: str) -> str:
-    return (PROMPTS_DIR / filename).read_text(encoding="utf-8")
 
 
 def _extract_json_object(raw_text: str) -> str:
@@ -81,21 +75,21 @@ class PromptContext(BaseModel):
     kevin_template: str
 
     @classmethod
-    def load(cls) -> "PromptContext":
-        gt_background = _read_prompt_file("grounded_theory_background.md")
-        task_background = _read_prompt_file("task_background.md")
+    def load(cls, prompts_dir: Path | None = None) -> "PromptContext":
+        gt_background = read_prompt_file("grounded_theory_background.md", prompts_dir=prompts_dir)
+        task_background = read_prompt_file("task_background.md", prompts_dir=prompts_dir)
         return cls(
             grounded_theory_background=gt_background,
             task_background=task_background,
-            bob_template=_read_prompt_file("agent_bob.md").format(
+            bob_template=read_prompt_file("agent_bob.md", prompts_dir=prompts_dir).format(
                 grounded_theory_background=gt_background,
                 task_background=task_background,
             ),
-            alice_template=_read_prompt_file("agent_alice.md").format(
+            alice_template=read_prompt_file("agent_alice.md", prompts_dir=prompts_dir).format(
                 grounded_theory_background=gt_background,
                 task_background=task_background,
             ),
-            kevin_template=_read_prompt_file("agent_kevin.md").format(
+            kevin_template=read_prompt_file("agent_kevin.md", prompts_dir=prompts_dir).format(
                 grounded_theory_background=gt_background,
                 task_background=task_background,
             ),

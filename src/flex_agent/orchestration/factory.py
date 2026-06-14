@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from deepagents import GeneralPurposeSubagentProfile, HarnessProfile, create_deep_agent, register_harness_profile
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
 from langgraph.checkpoint.memory import MemorySaver
@@ -34,9 +36,14 @@ def build_backend(workspace: Workspace) -> CompositeBackend:
     )
 
 
-def create_flex_agent(workspace: Workspace, *, tool_ctx: CodingToolContext | None = None):
+def create_flex_agent(
+    workspace: Workspace,
+    *,
+    prompts_dir: Path | None = None,
+    tool_ctx: CodingToolContext | None = None,
+):
     _ensure_flex_harness_profile()
-    ctx = tool_ctx or create_coding_tool_context(workspace)
+    ctx = tool_ctx or create_coding_tool_context(workspace, prompts_dir=prompts_dir)
     model_cfg = load_model_config()
     model = build_llm(
         model_cfg.pro_model,

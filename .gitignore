@@ -9,8 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-# Runtime workspace at repo root (generated coding artifacts)
-/workspace/
+# Runtime workspaces at repo root (generated coding artifacts)
+/workspaces/
 
 # Secrets
 .env

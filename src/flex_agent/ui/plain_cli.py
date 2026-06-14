@@ -9,7 +9,14 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 
 from flex_agent.orchestration import create_flex_agent
-from flex_agent.config import DEFAULT_WORKSPACE, PROJECT_ROOT, load_env_file
+from flex_agent.config import (
+    PROJECT_ROOT,
+    load_env_file,
+    path_label,
+    set_prompts_dir,
+    set_workspace_dir,
+)
+from flex_agent.models import SessionMeta
 from flex_agent.ui.events import (
     StreamEventParser,
     StepStatus,
@@ -146,13 +153,24 @@ async def _stream_agent_turn(
 
 async def run_plain_cli(
     *,
-    workspace_path: str | Path = DEFAULT_WORKSPACE,
+    workspace_spec: str = "baseline",
+    prompts_dir_spec: str = "baseline",
 ) -> int:
     load_env_file(PROJECT_ROOT / ".env")
-    workspace = Workspace(Path(workspace_path))
+    prompts_dir = set_prompts_dir(prompts_dir_spec)
+    workspace_dir = set_workspace_dir(workspace_spec)
+    workspace = Workspace(workspace_dir)
     workspace.ensure_layout()
     workspace.bootstrap_seed_files()
-    agent = create_flex_agent(workspace)
+    workspace.save_session_meta(
+        SessionMeta(
+            prompts_dir=path_label(prompts_dir),
+            workspace_dir=path_label(workspace_dir),
+            prompts_resolved=str(prompts_dir.resolve()),
+            workspace_resolved=str(workspace.root.resolve()),
+        )
+    )
+    agent = create_flex_agent(workspace, prompts_dir=prompts_dir)
     parser = StreamEventParser()
     renderer = PlainCliRenderer()
 

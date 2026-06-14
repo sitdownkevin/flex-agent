@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
@@ -15,7 +16,7 @@ from flex_agent.coding.quality import (
     normalize_finished_text,
     review_dimensions,
 )
-from flex_agent.config import build_llm, load_model_config
+from flex_agent.config import build_llm, get_prompts_dir, load_model_config, path_label
 from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 from flex_agent.workspace import Workspace
 
@@ -59,7 +60,9 @@ class CodingToolContext:
     workspace: Workspace
     llm: BaseChatModel
     llm_pro: BaseChatModel
-    prompt_ctx: PromptContext = field(default_factory=PromptContext.load)
+    prompt_ctx: PromptContext
+    prompts_dir_label: str
+    workspace_dir_label: str
 
 
 def _chunked(ids: list[int], size: int) -> list[list[int]]:
@@ -91,6 +94,8 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 sample_mode=sample_mode,
                 random_seed=random_seed,
                 open_mode=open_mode,
+                prompts_dir=ctx.prompts_dir_label,
+                workspace_dir=ctx.workspace_dir_label,
             )
             partition = ctx.workspace.load_partition()
             return (
@@ -313,7 +318,11 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
     ]
 
 
-def create_coding_tool_context(workspace: Workspace) -> CodingToolContext:
+def create_coding_tool_context(
+    workspace: Workspace,
+    *,
+    prompts_dir: Path | None = None,
+) -> CodingToolContext:
     model_cfg = load_model_config()
     llm = build_llm(
         model_cfg.default_model,
@@ -327,4 +336,12 @@ def create_coding_tool_context(workspace: Workspace) -> CodingToolContext:
         max_retries=model_cfg.max_retries,
         seed=model_cfg.seed,
     )
-    return CodingToolContext(workspace=workspace, llm=llm, llm_pro=llm_pro)
+    resolved_prompts = (prompts_dir or get_prompts_dir()).resolve()
+    return CodingToolContext(
+        workspace=workspace,
+        llm=llm,
+        llm_pro=llm_pro,
+        prompt_ctx=PromptContext.load(resolved_prompts),
+        prompts_dir_label=path_label(resolved_prompts),
+        workspace_dir_label=path_label(workspace.root),
+    )

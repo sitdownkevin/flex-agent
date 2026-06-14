@@ -8,7 +8,87 @@ from langchain_openai import ChatOpenAI
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_WORKSPACE = PROJECT_ROOT / "workspace"
+PROMPTS_ROOT = PROJECT_ROOT / "prompts"
+WORKSPACES_ROOT = PROJECT_ROOT / "workspaces"
+DEFAULT_PROMPTS_DIR = PROMPTS_ROOT / "baseline"
+DEFAULT_WORKSPACE = WORKSPACES_ROOT / "baseline"
+
+REQUIRED_PROMPT_FILES = (
+    "agent_alice.md",
+    "agent_bob.md",
+    "agent_kevin.md",
+    "grounded_theory_background.md",
+    "task_background.md",
+    "eval_text_alignment.md",
+    "eval_dimension_name_alignment.md",
+)
+
+_active_prompts_dir: Path = DEFAULT_PROMPTS_DIR
+_active_workspace_dir: Path = DEFAULT_WORKSPACE
+
+
+def path_label(path: Path, *, root: Path = PROJECT_ROOT) -> str:
+    resolved = path.resolve()
+    root_resolved = root.resolve()
+    try:
+        return resolved.relative_to(root_resolved).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def _resolve_under_root(spec: str | Path, *, root: Path, prefix: str) -> Path:
+    raw = Path(spec)
+    if raw.is_absolute():
+        return raw.resolve()
+
+    text = str(spec).strip()
+    if not text:
+        raise ValueError("Path spec must not be empty.")
+
+    candidate = (PROJECT_ROOT / text).resolve()
+    if candidate.exists() or "/" in text or text.startswith(prefix):
+        return candidate
+
+    return (root / text).resolve()
+
+
+def _validate_prompts_dir(path: Path) -> Path:
+    if not path.is_dir():
+        raise FileNotFoundError(f"Prompts directory not found: {path}")
+    missing = [name for name in REQUIRED_PROMPT_FILES if not (path / name).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"Prompts directory {path} is missing required files: {', '.join(missing)}"
+        )
+    return path
+
+
+def resolve_prompts_dir(spec: str | Path = "baseline") -> Path:
+    return _validate_prompts_dir(_resolve_under_root(spec, root=PROMPTS_ROOT, prefix="prompts/"))
+
+
+def resolve_workspace_dir(spec: str | Path = "baseline") -> Path:
+    return _resolve_under_root(spec, root=WORKSPACES_ROOT, prefix="workspaces/")
+
+
+def set_prompts_dir(spec: str | Path) -> Path:
+    global _active_prompts_dir
+    _active_prompts_dir = resolve_prompts_dir(spec)
+    return _active_prompts_dir
+
+
+def get_prompts_dir() -> Path:
+    return _active_prompts_dir
+
+
+def set_workspace_dir(spec: str | Path) -> Path:
+    global _active_workspace_dir
+    _active_workspace_dir = resolve_workspace_dir(spec)
+    return _active_workspace_dir
+
+
+def get_workspace_dir() -> Path:
+    return _active_workspace_dir
 
 
 def load_env_file(path: Path | None = None) -> None:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flex_agent.coding.export import export_open_coding_result
 from flex_agent.coding.quality import normalize_finished_text
-from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem, RunMeta
+from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem, RunMeta, SessionMeta
 from flex_agent.workspace import Workspace, load_comments_from_jsonl
 
 
@@ -30,8 +30,12 @@ class WorkspaceTests(unittest.TestCase):
                 codebook_nums=1,
                 kevin_batch_size=2,
                 random_seed=7,
+                prompts_dir="prompts/baseline",
+                workspace_dir="workspaces/test",
             )
             self.assertEqual(meta.max_nums, 3)
+            self.assertEqual(meta.prompts_dir, "prompts/baseline")
+            self.assertEqual(meta.workspace_dir, "workspaces/test")
             self.assertEqual(len(ws.load_texts()), 3)
             self.assertTrue((ws.corpus_dir / "raw.jsonl").exists())
             self.assertTrue((ws.corpus_dir / "queue.json").exists())
@@ -159,6 +163,39 @@ class WorkspaceTests(unittest.TestCase):
             loaded = ws.load_dimensions()
             self.assertEqual(len(loaded), 1)
             self.assertEqual(loaded[0].name, "体验")
+
+    def test_save_and_load_session_meta(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Workspace(Path(tmp))
+            ws.ensure_layout()
+            meta = SessionMeta(
+                prompts_dir="prompts/baseline",
+                workspace_dir="workspaces/baseline",
+                prompts_resolved="/tmp/prompts/baseline",
+                workspace_resolved="/tmp/workspaces/baseline",
+            )
+            ws.save_session_meta(meta)
+            loaded = ws.load_session_meta()
+            self.assertIsNotNone(loaded)
+            assert loaded is not None
+            self.assertEqual(loaded.prompts_dir, "prompts/baseline")
+            self.assertEqual(loaded.workspace_dir, "workspaces/baseline")
+
+    def test_status_includes_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Workspace(Path(tmp))
+            ws.ensure_layout()
+            ws.save_session_meta(
+                SessionMeta(
+                    prompts_dir="prompts/baseline",
+                    workspace_dir="workspaces/baseline",
+                    prompts_resolved="/tmp/prompts/baseline",
+                    workspace_resolved="/tmp/workspaces/baseline",
+                )
+            )
+            status = ws.status()
+            self.assertIsNotNone(status["session"])
+            self.assertEqual(status["session"]["prompts_dir"], "prompts/baseline")
 
     def test_save_and_load_coding(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

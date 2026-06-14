@@ -12,6 +12,7 @@ from flex_agent.models import (
     FinishedTextItem,
     PartitionMeta,
     RunMeta,
+    SessionMeta,
     TextItem,
     merge_quality_warnings,
 )
@@ -133,6 +134,14 @@ class Workspace:
     def save_run_meta(self, meta: RunMeta) -> None:
         self._write_json(self.meta_dir / "run.json", meta.model_dump())
 
+    def load_session_meta(self) -> SessionMeta | None:
+        raw = self._read_json(self.meta_dir / "session.json", None)
+        return SessionMeta.model_validate(raw) if raw else None
+
+    def save_session_meta(self, meta: SessionMeta) -> None:
+        self.ensure_layout()
+        self._write_json(self.meta_dir / "session.json", meta.model_dump())
+
     def load_partition(self) -> PartitionMeta:
         raw = self._read_json(self.corpus_dir / "partition.json", {})
         return PartitionMeta.model_validate(raw)
@@ -231,6 +240,8 @@ class Workspace:
         open_mode: str = "pure",
         sample_mode: str = "sequential",
         random_seed: int | None = None,
+        prompts_dir: str | None = None,
+        workspace_dir: str | None = None,
     ) -> RunMeta:
         self.ensure_layout()
         data_path = self.resolve_data_path(data_path)
@@ -260,6 +271,8 @@ class Workspace:
             open_mode=open_mode,
             sample_mode=sample_mode,
             random_seed=random_seed,
+            prompts_dir=prompts_dir,
+            workspace_dir=workspace_dir,
         )
         self.save_run_meta(meta)
         self.save_partition(
@@ -412,11 +425,13 @@ class Workspace:
 
     def status(self) -> dict:
         meta = self.load_run_meta()
+        session = self.load_session_meta()
         partition = self.load_partition()
         coded_ids = self.list_coded_ids()
         dimensions = self.load_dimensions()
         return {
             "workspace": str(self.root),
+            "session": session.model_dump() if session else None,
             "run": meta.model_dump() if meta else None,
             "benchmark_ready": self.benchmark_ready(),
             "corpus_seed": str(self.corpus_seed_path),

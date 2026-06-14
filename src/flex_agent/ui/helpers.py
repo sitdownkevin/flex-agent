@@ -6,7 +6,12 @@ from typing import Callable
 
 from flex_agent.coding.export import export_open_coding_result
 from flex_agent.eval import evaluate_workspace
-from flex_agent.models import DimensionDetail
+from flex_agent.config import (
+    get_prompts_dir,
+    get_workspace_dir,
+    path_label,
+)
+from flex_agent.models import DimensionDetail, SessionMeta
 from flex_agent.workspace import Workspace
 
 SlashHandler = Callable[[], str | None]
@@ -75,5 +80,15 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
         return True, report
     if cmd == "/clear":
         workspace.clear_artifacts()
+        prompts_dir = get_prompts_dir()
+        workspace_dir = get_workspace_dir()
+        workspace.save_session_meta(
+            SessionMeta(
+                prompts_dir=path_label(prompts_dir),
+                workspace_dir=path_label(workspace_dir),
+                prompts_resolved=str(prompts_dir.resolve()),
+                workspace_resolved=str(workspace.root.resolve()),
+            )
+        )
         return True, "Cleared workspace (corpus/ and private/ preserved)."
     return False, None
