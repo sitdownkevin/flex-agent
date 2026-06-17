@@ -11,6 +11,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from flex_agent.eval.aggregate import aggregate_eval_results
 from flex_agent.eval.judge import judge_semantic
 from flex_agent.eval.pairs import EvalPair
+from flex_agent.i18n import get_bundle
 from flex_agent.workspace import Workspace
 
 ProgressCallback = Callable[[str], None]
@@ -46,10 +47,15 @@ async def batch_semantic_judge(
         pending.append(pair)
 
     total_pairs = len(pairs)
+    progress = get_bundle().progress
     if on_progress is not None:
         on_progress(
-            f"[eval] semantic 待评测 {len(pending)} 条"
-            + (f" (已跳过 {skipped} 条 complete)" if skipped else "")
+            progress.semantic_pending.format(pending=len(pending))
+            + (
+                progress.semantic_pending_skipped_suffix.format(skipped=skipped)
+                if skipped
+                else ""
+            )
         )
 
     if not pending:
@@ -83,7 +89,7 @@ async def batch_semantic_judge(
                     "alignment": {},
                 }
                 if on_progress is not None:
-                    on_progress(f"[eval] semantic 跳过 text_id={pair.text_id}: {exc!r}")
+                    on_progress(progress.semantic_skip.format(text_id=pair.text_id, error=exc))
 
             existing["semantic"] = semantic
             workspace.save_eval_text("open", pair.text_id, existing)
@@ -100,10 +106,15 @@ async def batch_semantic_judge(
                     macro = semantic_agg["macro"]
                     complete = agg["semantic_complete"]
                     on_progress(
-                        f"[eval] semantic {done}/{len(pending)} 完成 "
-                        f"(累计 {complete}/{total_pairs}): "
-                        f"C={macro['consistency']:.1%} P={macro['precision']:.1%} "
-                        f"R={macro['recall']:.1%}"
+                        progress.semantic_progress.format(
+                            done=done,
+                            pending=len(pending),
+                            complete=complete,
+                            total=total_pairs,
+                            consistency=macro["consistency"],
+                            precision=macro["precision"],
+                            recall=macro["recall"],
+                        )
                     )
 
     await asyncio.gather(*(_judge_one(pair) for pair in pending))

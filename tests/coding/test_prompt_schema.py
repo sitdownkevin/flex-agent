@@ -8,6 +8,7 @@ from flex_agent.coding.agents import (
     BobItemDetail,
     BobOutput,
     KevinDimensionDetail,
+    get_agent_schema_models,
 )
 
 
@@ -38,6 +39,24 @@ class AgentStructuredOutputSchemaTests(unittest.TestCase):
         self.assertIn("已有代码本条目", kevin_items)
         self.assertIn("当前批次输入", kevin_items)
         self.assertNotIn("传入的 items_pool 或已有维度", kevin_items)
+
+    def test_english_runtime_schema_uses_english_descriptions(self) -> None:
+        schemas = get_agent_schema_models("en")
+        schema_text = json.dumps(
+            {
+                "bob_item": schemas.bob_item.model_json_schema(),
+                "bob_output": schemas.bob_output.model_json_schema(),
+                "alice_dimension": schemas.alice_dimension.model_json_schema(),
+                "kevin_dimension": schemas.kevin_dimension.model_json_schema(),
+            },
+            ensure_ascii=False,
+        )
+
+        self.assertIn("concise English summary", schema_text)
+        self.assertIn("English dimension", schema_text)
+        self.assertIn("<p>...</p>", schema_text)
+        self.assertNotIn("中文", schema_text)
+        self.assertNotIn("维度名称", schema_text)
 
 
 if __name__ == "__main__":

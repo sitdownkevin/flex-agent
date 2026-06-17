@@ -9,9 +9,14 @@ from .io import load_human_records, write_json, write_predictions_jsonl
 from .llm import LLMClient, OpenAIChatClient, load_env_file
 from .metrics import evaluate_axial, evaluate_open
 from .report import format_axial_report, format_open_report
+from flex_agent.i18n import set_language
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROMPT_PATH = PROJECT_ROOT / "direct_inference_eval" / "prompts" / "direct_batch.md"
+DEFAULT_PROMPT_PATHS = {
+    "zh": DEFAULT_PROMPT_PATH,
+    "en": PROJECT_ROOT / "direct_inference_eval" / "prompts" / "direct_batch_en.md",
+}
 
 
 def run_experiment(
@@ -26,10 +31,12 @@ def run_experiment(
     run_llm_semantic: bool = True,
     direct_client: LLMClient | None = None,
     semantic_client: LLMClient | None = None,
+    language: str | None = None,
 ) -> dict[str, Any]:
     load_env_file(PROJECT_ROOT / ".env")
+    active_language = set_language(language)
     records = load_human_records(input_path, limit=limit)
-    prompt_template = DEFAULT_PROMPT_PATH.read_text(encoding="utf-8")
+    prompt_template = DEFAULT_PROMPT_PATHS[active_language].read_text(encoding="utf-8")
     client = direct_client or OpenAIChatClient(model=model)
     semantic = None
     if run_llm_semantic:
@@ -51,6 +58,7 @@ def run_experiment(
             "input_path": str(input_path),
             "limit": limit,
             "batch_size": batch_size,
+            "language": active_language,
             "batches": batch_reports,
             "predicted_texts": len(predictions),
         },
@@ -68,6 +76,7 @@ def run_experiment(
             "input_path": str(input_path),
             "predicted_count": len(predictions),
             "batch_size": batch_size,
+            "language": active_language,
             "item_level_keyword": open_payload.get("item_level_keyword"),
         }
         if open_payload.get("item_level_semantic") is not None:
@@ -78,6 +87,7 @@ def run_experiment(
             item_semantic=open_payload.get("item_level_semantic"),
             input_path=str(input_path),
             predicted_count=len(predictions),
+            language=active_language,
         )
         report_path = open_dir / "report.txt"
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,6 +108,7 @@ def run_experiment(
             "predicted_count": len(predictions),
             "agent_category_count": axial_payload.get("agent_category_count", 0),
             "human_category_taxonomy": list(HUMAN_CATEGORIES),
+            "language": active_language,
             "item_level_keyword": axial_payload.get("item_level_keyword"),
         }
         if axial_payload.get("item_level_semantic") is not None:
@@ -110,6 +121,7 @@ def run_experiment(
             predicted_count=len(predictions),
             human_category_count=len(HUMAN_CATEGORIES),
             agent_category_count=axial_payload.get("agent_category_count", 0),
+            language=active_language,
         )
         report_path = axial_dir / "report.txt"
         report_path.parent.mkdir(parents=True, exist_ok=True)

@@ -9,60 +9,71 @@ if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
 from direct_eval.pipeline import run_experiment
+from flex_agent.i18n import get_bundle, set_language
 
 
 def build_parser() -> argparse.ArgumentParser:
+    set_language(None)
+    direct_text = get_bundle().direct
     parser = argparse.ArgumentParser(
-        description="Run self-contained direct inference baseline and CPR evaluation.",
+        description=direct_text.parser_description,
     )
     parser.add_argument(
         "--input",
         default="data/codebook_done_human.jsonl",
-        help="JSONL input with comments and human benchmark labels.",
+        help=direct_text.input_help,
     )
     parser.add_argument(
         "--output",
         default="direct_inference_eval/runs/default",
-        help="Output run directory.",
+        help=direct_text.output_help,
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=50,
-        help="Number of comments per direct inference LLM call.",
+        help=direct_text.batch_size_help,
     )
     parser.add_argument(
         "--mode",
         choices=("open", "axial", "both"),
         default="both",
-        help="Which evaluation report(s) to generate.",
+        help=direct_text.mode_help,
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Optional maximum number of input records to process.",
+        help=direct_text.limit_help,
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="Override OPENAI_MODEL for direct inference and semantic eval.",
+        help=direct_text.model_help,
     )
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="Reuse complete batch_*.json prediction files.",
+        help=direct_text.resume_help,
     )
     parser.add_argument(
         "--no-llm-semantic",
         action="store_true",
-        help="Skip optional LLM semantic alignment sections in reports.",
+        help=direct_text.no_llm_semantic_help,
+    )
+    parser.add_argument(
+        "--language",
+        choices=("zh", "en"),
+        default=None,
+        help=direct_text.language_help,
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    language = set_language(args.language)
+    direct_text = get_bundle(language).direct
     result = run_experiment(
         input_path=Path(args.input),
         output_dir=Path(args.output),
@@ -72,10 +83,11 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         resume=args.resume,
         run_llm_semantic=not args.no_llm_semantic,
+        language=language,
     )
-    print(f"Predictions: {result['records_path']}")
+    print(direct_text.predictions.format(path=result["records_path"]))
     for report_path in result["reports"]:
-        print(f"Report: {report_path}")
+        print(direct_text.report.format(path=report_path))
     return 0
 
 

@@ -62,6 +62,7 @@ class RunMeta(BaseModel):
     concurrency_limit: int = 10
     prompts_dir: str | None = None
     workspace_dir: str | None = None
+    language: str = "zh"
 
 
 class SessionMeta(BaseModel):
@@ -69,6 +70,7 @@ class SessionMeta(BaseModel):
     workspace_dir: str
     prompts_resolved: str
     workspace_resolved: str
+    language: str = "zh"
 
 
 class PartitionMeta(BaseModel):

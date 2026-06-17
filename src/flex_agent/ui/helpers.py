@@ -11,6 +11,7 @@ from flex_agent.config import (
     get_workspace_dir,
     path_label,
 )
+from flex_agent.i18n import get_bundle, get_language
 from flex_agent.models import DimensionDetail, SessionMeta
 from flex_agent.workspace import Workspace
 
@@ -19,7 +20,7 @@ SlashHandler = Callable[[], str | None]
 
 def format_codebook_tree(dimensions: list[DimensionDetail]) -> str:
     if not dimensions:
-        return "暂无 codebook 数据"
+        return get_bundle().cli.no_codebook_data
     lines = ["Codebook"]
     for dimension in dimensions:
         desc = f" ({dimension.definition})" if dimension.definition else ""
@@ -30,24 +31,7 @@ def format_codebook_tree(dimensions: list[DimensionDetail]) -> str:
 
 
 def format_help() -> str:
-    return "\n".join(
-        [
-            "Slash commands:",
-            "  /status      - show workspace counters",
-            "  /tree        - print codebook tree",
-            "  /export      - export open coding JSON",
-            "  /eval:open   - evaluate open coding vs human benchmark (default: both)",
-            "  /eval:open keyword|semantic|both|metrics",
-            "               metrics = re-aggregate CPR from eval/open/*.json (no LLM)",
-            "  /eval:axial  - evaluate axial coding vs human categories (default: both)",
-            "  /eval:axial keyword|semantic|both|metrics",
-            "               metrics = re-aggregate CPR from eval/axial/*.json (no LLM)",
-            "  /clear       - remove coding/codebook/meta/quality/exports (keep corpus/ & private/)",
-            "  /help        - show this help",
-            "  Esc      - interrupt the current agent turn",
-            "  exit     - quit",
-        ]
-    )
+    return get_bundle().cli.help_text
 
 
 def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str | None]:
@@ -63,11 +47,12 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
         return True, format_codebook_tree(workspace.load_dimensions())
     if cmd == "/export":
         path = export_open_coding_result(workspace)
-        return True, f"Exported to {path}"
+        return True, get_bundle().progress.export_result.format(path=path)
     if cmd == "/eval:open":
+        cli_text = get_bundle().cli
         mode = parts[1].lower() if len(parts) > 1 and not parts[1].startswith("--") else "both"
         if mode not in {"keyword", "semantic", "both", "metrics"}:
-            return True, f"未知评测模式: {mode}（可选 keyword / semantic / both / metrics）"
+            return True, cli_text.invalid_eval_mode.format(mode=mode)
         align = "--align" in parts
         try:
             report = evaluate_workspace(
@@ -79,12 +64,13 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
         except RuntimeError as exc:
             return True, str(exc)
         except Exception as exc:
-            return True, f"评测失败: {exc!r}"
+            return True, cli_text.eval_failed.format(error=exc)
         return True, report
     if cmd == "/eval:axial":
+        cli_text = get_bundle().cli
         mode = parts[1].lower() if len(parts) > 1 and not parts[1].startswith("--") else "both"
         if mode not in {"keyword", "semantic", "both", "metrics"}:
-            return True, f"未知评测模式: {mode}（可选 keyword / semantic / both / metrics）"
+            return True, cli_text.invalid_eval_mode.format(mode=mode)
         align = "--align" in parts
         try:
             report = evaluate_axial_workspace(
@@ -96,7 +82,7 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
         except RuntimeError as exc:
             return True, str(exc)
         except Exception as exc:
-            return True, f"主轴评测失败: {exc!r}"
+            return True, cli_text.axial_eval_failed.format(error=exc)
         return True, report
     if cmd == "/clear":
         workspace.clear_artifacts()
@@ -108,7 +94,8 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
                 workspace_dir=path_label(workspace_dir),
                 prompts_resolved=str(prompts_dir.resolve()),
                 workspace_resolved=str(workspace.root.resolve()),
+                language=get_language(),
             )
         )
-        return True, "Cleared workspace (corpus/ and private/ preserved)."
+        return True, get_bundle().cli.cleared_workspace
     return False, None

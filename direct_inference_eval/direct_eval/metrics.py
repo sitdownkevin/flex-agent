@@ -13,6 +13,7 @@ from .constants import (
 from .llm import LLMClient
 from .parser import extract_json_payload
 from .schemas import HumanRecord, PredictionRecord
+from flex_agent.i18n import get_bundle
 
 GLOBAL_AXIAL_TEXT_ID = 0
 
@@ -240,13 +241,10 @@ def semantic_dimension_alignment(
     human_items: list[str],
     agent_items: list[str],
 ) -> dict[str, str | None]:
-    prompt = (
-        "请判断 direct inference 给出的体验维度是否与人工维度语义等价。\n"
-        "只输出 JSON：{\"mapping\":{\"agent_dimension\":\"human_dimension or null\"}}。\n"
-        "允许多个 agent_dimension 匹配同一个 human_dimension；不匹配则为 null。\n\n"
-        f"评论：{content}\n"
-        f"人工维度：{json.dumps(human_items, ensure_ascii=False)}\n"
-        f"Agent 维度：{json.dumps(agent_items, ensure_ascii=False)}"
+    prompt = get_bundle().llm.direct_dimension_alignment_prompt.format(
+        content=content,
+        human_items=json.dumps(human_items, ensure_ascii=False),
+        agent_items=json.dumps(agent_items, ensure_ascii=False),
     )
     payload = extract_json_payload(client.complete(prompt))
     mapping = payload.get("mapping") if isinstance(payload, dict) else None
@@ -343,12 +341,9 @@ def semantic_category_alignment(
     agent_categories: set[str],
     human_categories: set[str],
 ) -> dict[str, str | None]:
-    prompt = (
-        "请将 direct inference 的全局高阶 category 与人工 category taxonomy 做语义映射。\n"
-        "要求严格一对一；无法匹配则为 null。\n"
-        "只输出 JSON：{\"mapping\":{\"agent_category\":\"human_category or null\"}}。\n\n"
-        f"人工 category：{json.dumps(sorted(human_categories), ensure_ascii=False)}\n"
-        f"Agent category：{json.dumps(sorted(agent_categories), ensure_ascii=False)}"
+    prompt = get_bundle().llm.direct_category_alignment_prompt.format(
+        human_categories=json.dumps(sorted(human_categories), ensure_ascii=False),
+        agent_categories=json.dumps(sorted(agent_categories), ensure_ascii=False),
     )
     payload = extract_json_payload(client.complete(prompt))
     mapping = payload.get("mapping") if isinstance(payload, dict) else None

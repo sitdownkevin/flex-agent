@@ -37,6 +37,7 @@ def export_open_coding_result(workspace: Workspace) -> Path:
             "random_seed": meta.random_seed,
             "prompts_dir": meta.prompts_dir,
             "workspace_dir": meta.workspace_dir,
+            "language": meta.language,
             "debug_dir": None,
             "finished_texts": len(finished),
             "dimensions": len(dimensions),

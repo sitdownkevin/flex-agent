@@ -22,6 +22,7 @@ from flex_agent.eval.axial_judge import (
 from flex_agent.eval.axial_pairs import load_axial_global_eval
 from flex_agent.eval.report import format_axial_coding_report
 from flex_agent.eval.semantic import build_dimension_name_alignment
+from flex_agent.i18n import get_bundle, get_language
 from flex_agent.workspace import Workspace
 
 ProgressCallback = Callable[[str], None]
@@ -59,9 +60,12 @@ def aggregate_axial_workspace_eval(
     on_progress: ProgressCallback | None = _default_progress,
 ) -> str:
     """Recompute CPR from eval/axial/global.json on disk (no LLM)."""
+    language = get_language()
+    progress = get_bundle(language).progress
+    report_text = get_bundle(language).report
     global_payload = load_axial_global_payload(workspace.eval_axial_dir)
     if global_payload is None:
-        raise RuntimeError("尚无主轴评测结果。请先运行 /eval:axial。")
+        raise RuntimeError(progress.axial_no_results)
 
     agg = aggregate_axial_global_payload(global_payload)
     item_keyword = agg.get("item_level_keyword")
@@ -87,6 +91,7 @@ def aggregate_axial_workspace_eval(
         benchmark_path=benchmark_path,
         codebook_dimensions_count=codebook_dimensions_count,
         human_category_count=len(human_category_taxonomy()),
+        language=language,
     )
 
     if save_json:
@@ -100,6 +105,7 @@ def aggregate_axial_workspace_eval(
             "benchmark_path": benchmark_path,
             "codebook_dimensions_count": codebook_dimensions_count,
             "human_category_taxonomy": list(HUMAN_CATEGORIES),
+            "language": language,
         }
         if item_keyword is not None:
             payload["item_level_keyword"] = item_keyword
@@ -119,16 +125,17 @@ def aggregate_axial_workspace_eval(
                 "coded_count": coded_count,
                 "benchmark_path": benchmark_path,
                 "codebook_dimensions_count": codebook_dimensions_count,
+                "language": language,
                 "keyword_complete": agg["keyword_complete"],
                 "semantic_complete": agg["semantic_complete"],
             },
         )
         rel_summary = output_path.relative_to(workspace.root).as_posix()
         rel_report = workspace.eval_report_path("axial").relative_to(workspace.root).as_posix()
-        _emit_progress(on_progress, f"[eval:axial] 聚合完成: {rel_summary}")
-        report += f"\n汇总已保存: {rel_summary}"
-        report += f"\n报告文本已保存: {rel_report}"
-        report += f"\n全局结果: eval/axial/{AXIAL_GLOBAL_RESULT_NAME}"
+        _emit_progress(on_progress, progress.axial_aggregate_saved.format(path=rel_summary))
+        report += "\n" + report_text.summary_saved.format(path=rel_summary)
+        report += "\n" + report_text.report_saved.format(path=rel_report)
+        report += "\n" + report_text.axial_global_result.format(name=AXIAL_GLOBAL_RESULT_NAME)
 
     return report
 
@@ -145,6 +152,9 @@ def evaluate_axial_workspace(
 ) -> str:
     """Evaluate workspace axial coding once: codebook dimensions vs human categories."""
     del concurrency_limit  # global eval uses a single semantic LLM call
+    language = get_language()
+    progress = get_bundle(language).progress
+    report_text = get_bundle(language).report
 
     if mode == "metrics":
         return aggregate_axial_workspace_eval(
@@ -155,17 +165,15 @@ def evaluate_axial_workspace(
         )
 
     if not workspace.benchmark_ready():
-        raise RuntimeError(
-            "人工 benchmark 未就绪。请确认 flex-agent/data/ 下种子文件存在，并重新启动 CLI。"
-        )
+        raise RuntimeError(progress.eval_benchmark_missing)
 
     dimensions = workspace.load_dimensions()
     if not dimensions:
-        raise RuntimeError("尚无 codebook 维度。请先运行 Alice/Kevin 生成 codebook/dimensions.json。")
+        raise RuntimeError(progress.axial_no_dimensions)
 
     ctx = load_axial_global_eval(workspace)
     if not ctx.agent_axial_dims:
-        raise RuntimeError("codebook 无有效主轴维度名。")
+        raise RuntimeError(progress.axial_no_valid_dimensions)
 
     coded_count = len(workspace.list_coded_ids())
     benchmark_path = workspace.human_benchmark_path
@@ -174,9 +182,10 @@ def evaluate_axial_workspace(
 
     _emit_progress(
         on_progress,
-        (
-            f"[eval:axial] 开始 workspace 级评测 mode={mode}："
-            f"codebook {len(agent_dims)} 维 vs {len(human_categories)} 类 category"
+        progress.axial_start.format(
+            mode=mode,
+            agent_count=len(agent_dims),
+            human_count=len(human_categories),
         ),
     )
 
@@ -185,7 +194,7 @@ def evaluate_axial_workspace(
         if sorted_agent:
             _emit_progress(
                 on_progress,
-                f"[eval:axial] LLM category 映射: {len(sorted_agent)} 个 agent 主轴维度",
+                progress.axial_category_mapping.format(count=len(sorted_agent)),
             )
             model_cfg = load_model_config()
             llm = build_llm(
@@ -207,15 +216,16 @@ def evaluate_axial_workspace(
     existing = load_axial_global_payload(workspace.eval_axial_dir) or {}
 
     if mode in {"keyword", "both"}:
-        _emit_progress(on_progress, "[eval:axial] keyword 全局评测...")
+        _emit_progress(on_progress, progress.axial_keyword_running)
         keyword = judge_axial_global_keyword(ctx, agent_dims=agent_dims)
         global_payload["keyword"] = keyword
         metrics = keyword
         _emit_progress(
             on_progress,
-            (
-                f"[eval:axial] keyword: C={metrics['consistency']:.1%} "
-                f"P={metrics['precision']:.1%} R={metrics['recall']:.1%}"
+            progress.axial_keyword_macro.format(
+                consistency=metrics["consistency"],
+                precision=metrics["precision"],
+                recall=metrics["recall"],
             ),
         )
     elif resume and existing.get("keyword"):
@@ -223,10 +233,10 @@ def evaluate_axial_workspace(
 
     if mode in {"semantic", "both"}:
         if resume and existing.get("semantic", {}).get("status") == "complete":
-            _emit_progress(on_progress, "[eval:axial] semantic 跳过（已有 complete 结果）")
+            _emit_progress(on_progress, progress.axial_semantic_skip_complete)
             global_payload["semantic"] = existing["semantic"]
         else:
-            _emit_progress(on_progress, "[eval:axial] semantic 全局评测（1 次 LLM）...")
+            _emit_progress(on_progress, progress.axial_semantic_running)
             model_cfg = load_model_config()
             align_llm = build_llm(
                 model_cfg.default_model,
@@ -238,9 +248,10 @@ def evaluate_axial_workspace(
             global_payload["semantic"] = semantic
             _emit_progress(
                 on_progress,
-                (
-                    f"[eval:axial] semantic: C={semantic['consistency']:.1%} "
-                    f"P={semantic['precision']:.1%} R={semantic['recall']:.1%}"
+                progress.axial_semantic_macro.format(
+                    consistency=semantic["consistency"],
+                    precision=semantic["precision"],
+                    recall=semantic["recall"],
                 ),
             )
     elif resume and existing.get("semantic"):
@@ -248,7 +259,7 @@ def evaluate_axial_workspace(
 
     _write_axial_global_result(workspace.eval_axial_dir, global_payload)
 
-    _emit_progress(on_progress, "[eval:axial] 生成报告...")
+    _emit_progress(on_progress, progress.axial_generating_report)
     agg = aggregate_axial_global_payload(global_payload)
     item_keyword = agg.get("item_level_keyword") if mode in {"keyword", "both"} else None
     item_semantic = agg.get("item_level_semantic") if mode in {"semantic", "both"} else None
@@ -260,6 +271,7 @@ def evaluate_axial_workspace(
         benchmark_path=str(benchmark_path),
         codebook_dimensions_count=len(dimensions),
         human_category_count=len(human_categories),
+        language=language,
     )
 
     if save_json:
@@ -273,6 +285,7 @@ def evaluate_axial_workspace(
             "benchmark_path": str(benchmark_path),
             "codebook_dimensions_count": len(dimensions),
             "human_category_taxonomy": list(HUMAN_CATEGORIES),
+            "language": language,
         }
         if item_keyword is not None:
             payload["item_level_keyword"] = item_keyword
@@ -292,16 +305,17 @@ def evaluate_axial_workspace(
                 "coded_count": coded_count,
                 "benchmark_path": str(benchmark_path),
                 "codebook_dimensions_count": len(dimensions),
+                "language": language,
                 "keyword_complete": agg["keyword_complete"],
                 "semantic_complete": agg["semantic_complete"],
             },
         )
         rel_summary = output_path.relative_to(workspace.root).as_posix()
         rel_report = workspace.eval_report_path("axial").relative_to(workspace.root).as_posix()
-        _emit_progress(on_progress, f"[eval:axial] 保存结果: {rel_summary}")
-        report += f"\n汇总已保存: {rel_summary}"
-        report += f"\n报告文本已保存: {rel_report}"
-        report += f"\n全局结果: eval/axial/{AXIAL_GLOBAL_RESULT_NAME}"
+        _emit_progress(on_progress, progress.axial_saved.format(path=rel_summary))
+        report += "\n" + report_text.summary_saved.format(path=rel_summary)
+        report += "\n" + report_text.report_saved.format(path=rel_report)
+        report += "\n" + report_text.axial_global_result.format(name=AXIAL_GLOBAL_RESULT_NAME)
 
-    _emit_progress(on_progress, "[eval:axial] 评测完成")
+    _emit_progress(on_progress, progress.axial_complete)
     return report

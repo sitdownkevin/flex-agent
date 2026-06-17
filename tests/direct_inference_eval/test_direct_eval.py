@@ -10,6 +10,7 @@ from direct_inference_eval.direct_eval.metrics import evaluate_axial, evaluate_o
 from direct_inference_eval.direct_eval.parser import parse_prediction_response
 from direct_inference_eval.direct_eval.pipeline import run_experiment
 from direct_inference_eval.direct_eval.schemas import HumanRecord, PredictionItem, PredictionRecord
+from flex_agent.i18n import set_language
 
 
 class FakeClient:
@@ -194,8 +195,67 @@ class PipelineOutputTests(unittest.TestCase):
             open_summary = json.loads((root / "run" / "eval" / "open" / "summary.json").read_text(encoding="utf-8"))
             axial_global = json.loads((root / "run" / "eval" / "axial" / "global.json").read_text(encoding="utf-8"))
             self.assertEqual(open_summary["eval_kind"], "open")
+            self.assertEqual(open_summary["language"], "zh")
             self.assertEqual(open_summary["item_level_keyword"]["macro"]["precision"], 1.0)
             self.assertIn("keyword", axial_global)
+
+    def test_run_experiment_english_language_uses_english_prompt_and_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            input_path = root / "fixture.jsonl"
+            input_path.write_text(
+                json.dumps(
+                    {
+                        "id": 1,
+                        "comments": "画面很好",
+                        "human_items": [{"dimension": "画面", "category": "sensory appeal", "value": 1}],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            client = FakeClient([
+                json.dumps(
+                    {
+                        "records": [
+                            {
+                                "text_id": 1,
+                                "items": [
+                                    {
+                                        "evidence": "画面很好",
+                                        "dimension": "visual quality",
+                                        "category": "sensory appeal",
+                                        "value": 1,
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                )
+            ])
+
+            try:
+                run_experiment(
+                    input_path=input_path,
+                    output_dir=root / "run-en",
+                    batch_size=1,
+                    mode="open",
+                    resume=False,
+                    run_llm_semantic=False,
+                    direct_client=client,
+                    language="en",
+                )
+
+                self.assertIn("concise English dimension", client.prompts[0])
+                self.assertNotIn("简洁中文维度", client.prompts[0])
+                summary = json.loads((root / "run-en" / "eval" / "open" / "summary.json").read_text(encoding="utf-8"))
+                report = (root / "run-en" / "eval" / "open" / "report.txt").read_text(encoding="utf-8")
+                self.assertEqual(summary["language"], "en")
+                self.assertIn("Direct Inference Open Coding Quality Evaluation", report)
+                self.assertNotIn("质量评估", report)
+            finally:
+                set_language("zh")
 
 
 if __name__ == "__main__":

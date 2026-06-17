@@ -20,17 +20,19 @@ cp env.example .env   # 配置 OPENAI_API_KEY 等
 uv run flex-agent
 ```
 
-默认使用 `prompts/baseline` 提示词与 `workspaces/baseline` 数据目录。启动时会自动将 `data/codebook_done.jsonl` 与 `data/codebook_done_human.jsonl` 播种到 workspace。
+默认语言为 `zh`，使用 `prompts/baseline` 提示词与 `workspaces/baseline` 数据目录。启动时会自动将 `data/codebook_done.jsonl` 与 `data/codebook_done_human.jsonl` 播种到 workspace。
 
-切换 prompt 集或 workspace 分类：
+切换语言、prompt 集或 workspace 分类：
 
 ```bash
+uv run flex-agent --language en
+FLEX_AGENT_LANGUAGE=en uv run flex-agent
 uv run flex-agent --prompts-dir baseline
 uv run flex-agent --workspace exp-v2
 uv run flex-agent --prompts-dir exp-v2 --workspace exp-v2
 ```
 
-参数支持简写名（如 `baseline` → `prompts/baseline` / `workspaces/baseline`）、相对路径或绝对路径。
+`--language zh|en` 会控制代码侧提示词、schema 描述、CLI 文案、进度与评测报告；未显式传 `--prompts-dir` 时，`zh` 默认 `prompts/baseline`，`en` 默认 `prompts/baseline_en`。`--prompts-dir` 和 `--workspace` 参数支持简写名（如 `baseline` → `prompts/baseline` / `workspaces/baseline`）、相对路径或绝对路径。
 
 示例指令：
 

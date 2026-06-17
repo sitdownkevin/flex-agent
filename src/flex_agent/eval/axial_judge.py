@@ -17,8 +17,17 @@ from flex_agent.eval.semantic_metrics import (
     merge_semantic_alignments,
     prefetch_semantic_alignment,
 )
+from flex_agent.i18n import get_language
 
 GLOBAL_EVAL_CONTENT = "（workspace 级 codebook 主轴维度评测）"
+
+
+def _global_eval_content() -> str:
+    return (
+        "(workspace-level codebook axial-dimension evaluation)"
+        if get_language() == "en"
+        else GLOBAL_EVAL_CONTENT
+    )
 
 
 def apply_axial_alignment_to_dims(
@@ -81,7 +90,7 @@ def judge_axial_global_semantic(
     if pending_agent and ctx.agent_dimensions_detail:
         entry = {
             "text_id": AXIAL_GLOBAL_TEXT_ID,
-            "content": GLOBAL_EVAL_CONTENT,
+            "content": _global_eval_content(),
             "human_categories": sorted(human_categories),
             "agent_dimensions": ctx.agent_dimensions_detail,
         }

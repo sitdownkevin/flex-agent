@@ -242,6 +242,7 @@ class Workspace:
         random_seed: int | None = None,
         prompts_dir: str | None = None,
         workspace_dir: str | None = None,
+        language: str = "zh",
     ) -> RunMeta:
         self.ensure_layout()
         data_path = self.resolve_data_path(data_path)
@@ -273,6 +274,7 @@ class Workspace:
             random_seed=random_seed,
             prompts_dir=prompts_dir,
             workspace_dir=workspace_dir,
+            language=language,
         )
         self.save_run_meta(meta)
         self.save_partition(

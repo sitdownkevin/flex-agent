@@ -3,28 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flex_agent.i18n import get_bundle
 
-TOOL_LABELS: dict[str, str] = {
-    "write_todos": "更新计划",
-    "init_open_coding_run": "初始化语料",
-    "batch_bob_code": "Bob 批量编码",
-    "run_alice_codebook": "Alice 归纳代码本",
-    "run_kevin_batches": "Kevin 增量更新",
-    "export_result": "导出结果",
-    "workspace_status": "检查 workspace",
-    "task": "子 Agent 任务",
-    "read_file": "读取文件",
-    "write_file": "写入文件",
-    "edit_file": "编辑文件",
-    "glob": "搜索文件",
-    "grep": "搜索内容",
-    "ls": "列出目录",
-    "execute": "执行命令",
-}
+TOOL_LABELS: dict[str, str] = dict(get_bundle("zh").cli.tool_labels)
 
 
 def tool_label(name: str) -> str:
-    return TOOL_LABELS.get(name, name)
+    return get_bundle().cli.tool_labels.get(name, name)
 
 
 def summarize_tool_args(name: str, args: Any) -> str:
@@ -45,12 +30,12 @@ def summarize_tool_args(name: str, args: Any) -> str:
 
     if name == "write_todos":
         todos = args.get("todos") or []
-        return f"{len(todos)} 项"
+        return get_bundle().cli.todo_count.format(count=len(todos))
 
     if name == "batch_bob_code":
         ids = args.get("text_ids")
         if ids:
-            return f"{len(ids)} 条"
+            return get_bundle().cli.text_count.format(count=len(ids))
         concurrency = args.get("concurrency_limit")
         return f"concurrency={concurrency}" if concurrency else ""
 

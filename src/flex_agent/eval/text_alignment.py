@@ -5,31 +5,69 @@ from __future__ import annotations
 import json
 import re
 import sys
+from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from flex_agent.eval.core import EvalMetrics, normalize_dimension
 from flex_agent.eval.prompts import text_alignment_prompt
+from flex_agent.i18n import Language, get_bundle, get_language, resolve_language
+
+_DEFAULT_SCHEMA_DESCRIPTIONS = get_bundle("zh").llm.schema_descriptions
 
 
 class SemanticMatch(BaseModel):
     agent_dimension: str
     matched_human_dimension: str | None = None
-    thought: str = Field(default="", description="可选的简短判断依据。")
-    action: str = Field(default="", description="可选的简短匹配结果标记。")
+    thought: str = Field(default="", description=_DEFAULT_SCHEMA_DESCRIPTIONS["semantic_match_thought"])
+    action: str = Field(default="", description=_DEFAULT_SCHEMA_DESCRIPTIONS["semantic_match_action"])
 
 
 class TextSemanticAlignment(BaseModel):
     text_id: str
-    reasoning_trace: str = Field(default="", description="可选的整条文本简短判断摘要。")
+    reasoning_trace: str = Field(
+        default="",
+        description=_DEFAULT_SCHEMA_DESCRIPTIONS["semantic_text_reasoning_trace"],
+    )
     matches: list[SemanticMatch] = Field(default_factory=list)
 
 
 class BatchSemanticAlignment(BaseModel):
     texts: list[TextSemanticAlignment] = Field(default_factory=list)
+
+
+def get_batch_semantic_alignment_model(language: str | None = None) -> type[BaseModel]:
+    active_language = resolve_language(language) if language is not None else get_language()
+    return _get_batch_semantic_alignment_model(active_language)
+
+
+@lru_cache(maxsize=2)
+def _get_batch_semantic_alignment_model(active_language: Language) -> type[BaseModel]:
+    descriptions = get_bundle(active_language).llm.schema_descriptions
+    suffix = "Zh" if active_language == "zh" else "En"
+    semantic_match = create_model(
+        f"SemanticMatch{suffix}",
+        agent_dimension=(str, ...),
+        matched_human_dimension=(str | None, None),
+        thought=(str, Field(default="", description=descriptions["semantic_match_thought"])),
+        action=(str, Field(default="", description=descriptions["semantic_match_action"])),
+    )
+    text_alignment = create_model(
+        f"TextSemanticAlignment{suffix}",
+        text_id=(str, ...),
+        reasoning_trace=(
+            str,
+            Field(default="", description=descriptions["semantic_text_reasoning_trace"]),
+        ),
+        matches=(list[semantic_match], Field(default_factory=list)),  # type: ignore[valid-type]
+    )
+    return create_model(
+        f"BatchSemanticAlignment{suffix}",
+        texts=(list[text_alignment], Field(default_factory=list)),  # type: ignore[valid-type]
+    )
 
 
 def _human_items_for_prompt(record: dict[str, Any], fallback_items: dict[str, int]) -> list[dict[str, Any]]:
@@ -172,6 +210,8 @@ def _human_from_react_action(action: str, human_dims: set[str]) -> str | None:
 def build_semantic_alignment_for_texts(
     text_batch: list[dict[str, Any]],
     llm: BaseChatModel,
+    *,
+    language: str | None = None,
 ) -> dict[int, dict[str, str | None]]:
     if not text_batch:
         return {}
@@ -185,10 +225,11 @@ def build_semantic_alignment_for_texts(
         })
     try:
         prompt = ChatPromptTemplate.from_messages([("human", text_alignment_prompt())])
-        chain = prompt | llm.with_structured_output(BatchSemanticAlignment, method="json_schema")
-        result: BatchSemanticAlignment = chain.invoke({"texts_json": json.dumps(prompt_rows, ensure_ascii=False)})
+        schema = get_batch_semantic_alignment_model(language)
+        chain = prompt | llm.with_structured_output(schema, method="json_schema")
+        result = chain.invoke({"texts_json": json.dumps(prompt_rows, ensure_ascii=False)})
     except Exception as exc:
-        print(f"  [warn] semantic evidence alignment LLM call failed: {exc!r}", file=sys.stderr)
+        print(get_bundle(language).llm.eval_semantic_warning.format(error=exc), file=sys.stderr)
         return {}
 
     expected = {str(entry["text_id"]): entry for entry in text_batch}

@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from flex_agent.eval.prompts import dimension_name_alignment_prompt
+from flex_agent.i18n import get_bundle
 
 
 def apply_semantic_alignment(
@@ -47,10 +48,11 @@ def build_dimension_name_alignment(
     human_list = "\n".join(f"- {d}" for d in human_dimensions)
 
     prompt = dimension_name_alignment_prompt(human_list=human_list, agent_list=agent_list)
+    bundle = get_bundle()
 
     class AlignmentResult(BaseModel):
         mapping: dict[str, str | None] = Field(
-            description="Mapping from agent dimension to human dimension (or null if no match)."
+            description=bundle.llm.schema_descriptions["dimension_alignment_mapping"]
         )
 
     chat_prompt = ChatPromptTemplate.from_messages([("human", prompt)])
@@ -71,7 +73,7 @@ def build_dimension_name_alignment(
         return validated
     except Exception as exc:
         print(
-            f"  [warn] semantic alignment LLM call failed: {exc!r}, falling back to exact match",
+            bundle.llm.eval_dimension_warning.format(error=exc),
             file=sys.stderr,
         )
         return {}

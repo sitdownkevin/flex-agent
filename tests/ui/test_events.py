@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from flex_agent.ui.events import StepRecord, StepStatus, StreamEventParser
 from flex_agent.ui.labels import summarize_tool_args, tool_label
+from flex_agent.i18n import set_language
 
 
 class StreamEventParserTests(unittest.TestCase):
@@ -114,8 +115,20 @@ class StreamEventParserTests(unittest.TestCase):
 
 class ToolLabelTests(unittest.TestCase):
     def test_tool_label_mapping(self) -> None:
+        set_language("zh")
         self.assertEqual(tool_label("init_open_coding_run"), "初始化语料")
         self.assertEqual(tool_label("unknown_tool"), "unknown_tool")
+
+    def test_tool_label_mapping_english(self) -> None:
+        try:
+            set_language("en")
+            self.assertEqual(tool_label("init_open_coding_run"), "Initialize corpus")
+            self.assertEqual(
+                summarize_tool_args("batch_bob_code", {"text_ids": [1, 2]}),
+                "2 texts",
+            )
+        finally:
+            set_language("zh")
 
     def test_task_summary(self) -> None:
         summary = summarize_tool_args(

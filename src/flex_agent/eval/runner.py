@@ -13,6 +13,7 @@ from flex_agent.eval.judge import judge_keyword
 from flex_agent.eval.pairs import load_eval_pairs
 from flex_agent.eval.report import format_open_coding_report
 from flex_agent.eval.semantic import apply_semantic_alignment, build_dimension_name_alignment
+from flex_agent.i18n import get_bundle, get_language
 from flex_agent.workspace import Workspace
 
 ProgressCallback = Callable[[str], None]
@@ -34,8 +35,11 @@ def aggregate_workspace_eval(
     on_progress: ProgressCallback | None = _default_progress,
 ) -> str:
     """Recompute CPR from eval/open/{id}.json on disk (no LLM)."""
+    language = get_language()
+    progress = get_bundle(language).progress
+    report_text = get_bundle(language).report
     if not workspace.eval_open_dir.exists():
-        raise RuntimeError("尚无评测结果。请先运行 /eval:open。")
+        raise RuntimeError(progress.eval_no_results)
 
     agg = aggregate_eval_results(workspace.eval_open_dir)
     item_keyword = agg.get("item_level_keyword")
@@ -55,6 +59,7 @@ def aggregate_workspace_eval(
         item_semantic=item_semantic,
         coded_count=coded_count,
         benchmark_path=benchmark_path,
+        language=language,
     )
 
     if save_json:
@@ -64,6 +69,7 @@ def aggregate_workspace_eval(
             "status": "complete",
             "coded_count": coded_count,
             "benchmark_path": benchmark_path,
+            "language": language,
         }
         if item_keyword is not None:
             payload["item_level_keyword"] = item_keyword
@@ -80,6 +86,7 @@ def aggregate_workspace_eval(
                 "status": "complete",
                 "coded_count": coded_count,
                 "benchmark_path": benchmark_path,
+                "language": language,
                 "keyword_complete": agg["keyword_complete"],
                 "semantic_complete": agg["semantic_complete"],
             },
@@ -87,10 +94,10 @@ def aggregate_workspace_eval(
         rel_summary = output_path.relative_to(workspace.root).as_posix()
         rel_report = workspace.eval_report_path("open").relative_to(workspace.root).as_posix()
         per_text_count = len(workspace.list_eval_text_ids("open"))
-        _emit_progress(on_progress, f"[eval] 聚合完成: {rel_summary}")
-        report += f"\n汇总已保存: {rel_summary}"
-        report += f"\n报告文本已保存: {rel_report}"
-        report += f"\n已聚合 {per_text_count} 条 per-text 结果"
+        _emit_progress(on_progress, progress.eval_aggregate_saved.format(path=rel_summary))
+        report += "\n" + report_text.summary_saved.format(path=rel_summary)
+        report += "\n" + report_text.report_saved.format(path=rel_report)
+        report += "\n" + report_text.per_text_aggregated.format(count=per_text_count)
 
     return report
 
@@ -106,6 +113,9 @@ def evaluate_workspace(
     on_progress: ProgressCallback | None = _default_progress,
 ) -> str:
     """Evaluate workspace open coding: align → judge per-text → aggregate CPR."""
+    language = get_language()
+    progress = get_bundle(language).progress
+    report_text = get_bundle(language).report
     if mode == "metrics":
         return aggregate_workspace_eval(
             workspace,
@@ -115,29 +125,29 @@ def evaluate_workspace(
         )
 
     if not workspace.benchmark_ready():
-        raise RuntimeError(
-            "人工 benchmark 未就绪。请确认 flex-agent/data/ 下种子文件存在，并重新启动 CLI。"
-        )
+        raise RuntimeError(progress.eval_benchmark_missing)
 
     coded_count = len(workspace.list_coded_ids())
     if coded_count == 0:
-        raise RuntimeError("尚无已编码文本。请先运行 Bob 编码（batch_bob_code）后再评测。")
+        raise RuntimeError(progress.eval_no_coded_texts)
 
-    _emit_progress(on_progress, f"[eval] 开始评测 mode={mode}，已编码 {coded_count} 条文本")
+    _emit_progress(on_progress, progress.eval_start.format(mode=mode, coded_count=coded_count))
 
     benchmark_path = workspace.human_benchmark_path
-    _emit_progress(on_progress, f"[eval] 加载人工 benchmark: {benchmark_path}")
+    _emit_progress(on_progress, progress.eval_load_benchmark.format(path=benchmark_path))
     pairs, agent_only = load_eval_pairs(workspace, benchmark_path=benchmark_path)
     _emit_progress(
         on_progress,
-        (
-            f"[eval] 对齐 {len(pairs)} 对 "
-            f"(agent={coded_count}, human={len(pairs)}, agent_only={agent_only})"
+        progress.eval_aligned_pairs.format(
+            pairs=len(pairs),
+            coded_count=coded_count,
+            human_count=len(pairs),
+            agent_only=agent_only,
         ),
     )
 
     if not pairs:
-        raise RuntimeError("无可用对齐文本。请确认 coding/ 与 private/ benchmark 正文一致。")
+        raise RuntimeError(progress.eval_no_pairs)
 
     agent_items = extract_agent_items([
         {"id": pair.text_id, "items": pair.agent_items_raw} for pair in pairs
@@ -149,7 +159,7 @@ def evaluate_workspace(
         if unmatched:
             _emit_progress(
                 on_progress,
-                f"[eval] LLM 维度名映射: {len(unmatched)} 个未匹配维度",
+                progress.eval_dimension_mapping.format(count=len(unmatched)),
             )
             model_cfg = load_model_config()
             llm = build_llm(
@@ -164,7 +174,7 @@ def evaluate_workspace(
     workspace.eval_open_dir.mkdir(parents=True, exist_ok=True)
 
     if mode in {"keyword", "both"}:
-        _emit_progress(on_progress, "[eval] keyword 逐条评测...")
+        _emit_progress(on_progress, progress.eval_keyword_running)
         for pair in pairs:
             keyword = judge_keyword(pair, agent_items=agent_items.get(pair.text_id))
             existing = workspace.load_eval_text("open", pair.text_id) or {"text_id": pair.text_id}
@@ -172,16 +182,17 @@ def evaluate_workspace(
             workspace.save_eval_text("open", pair.text_id, existing)
         _emit_progress(
             on_progress,
-            f"[eval] keyword 全量完成 → 写入 eval/open/*.json ({len(pairs)} 条)",
+            progress.eval_keyword_written.format(count=len(pairs)),
         )
         agg = aggregate_eval_results(workspace.eval_open_dir)
         if agg.get("item_level_keyword"):
             macro = agg["item_level_keyword"]["macro"]
             _emit_progress(
                 on_progress,
-                (
-                    f"[eval] keyword 聚合: C={macro['consistency']:.1%} "
-                    f"P={macro['precision']:.1%} R={macro['recall']:.1%}"
+                progress.eval_keyword_macro.format(
+                    consistency=macro["consistency"],
+                    precision=macro["precision"],
+                    recall=macro["recall"],
                 ),
             )
 
@@ -208,14 +219,16 @@ def evaluate_workspace(
             macro = agg["item_level_semantic"]["macro"]
             _emit_progress(
                 on_progress,
-                (
-                    f"[eval] semantic 聚合: C={macro['consistency']:.1%} "
-                    f"P={macro['precision']:.1%} R={macro['recall']:.1%} "
-                    f"(complete {agg['semantic_complete']}/{len(pairs)})"
+                progress.eval_semantic_macro.format(
+                    consistency=macro["consistency"],
+                    precision=macro["precision"],
+                    recall=macro["recall"],
+                    complete=agg["semantic_complete"],
+                    total=len(pairs),
                 ),
             )
 
-    _emit_progress(on_progress, "[eval] 生成报告...")
+    _emit_progress(on_progress, progress.eval_generating_report)
     agg = aggregate_eval_results(workspace.eval_open_dir)
     item_keyword = agg.get("item_level_keyword") if mode in {"keyword", "both"} else None
     item_semantic = agg.get("item_level_semantic") if mode in {"semantic", "both"} else None
@@ -225,6 +238,7 @@ def evaluate_workspace(
         item_semantic=item_semantic,
         coded_count=coded_count,
         benchmark_path=str(benchmark_path),
+        language=language,
     )
 
     if save_json:
@@ -234,6 +248,7 @@ def evaluate_workspace(
             "status": "complete",
             "coded_count": coded_count,
             "benchmark_path": str(benchmark_path),
+            "language": language,
         }
         if item_keyword is not None:
             payload["item_level_keyword"] = item_keyword
@@ -250,6 +265,7 @@ def evaluate_workspace(
                 "status": "complete",
                 "coded_count": coded_count,
                 "benchmark_path": str(benchmark_path),
+                "language": language,
                 "keyword_complete": agg["keyword_complete"],
                 "semantic_complete": agg["semantic_complete"],
             },
@@ -257,10 +273,10 @@ def evaluate_workspace(
         rel_summary = output_path.relative_to(workspace.root).as_posix()
         rel_report = workspace.eval_report_path("open").relative_to(workspace.root).as_posix()
         per_text_count = len(workspace.list_eval_text_ids("open"))
-        _emit_progress(on_progress, f"[eval] 保存结果: {rel_summary}")
-        report += f"\n汇总已保存: {rel_summary}"
-        report += f"\n报告文本已保存: {rel_report}"
-        report += f"\n已写入 {per_text_count} 条 per-text 结果"
+        _emit_progress(on_progress, progress.eval_saved.format(path=rel_summary))
+        report += "\n" + report_text.summary_saved.format(path=rel_summary)
+        report += "\n" + report_text.report_saved.format(path=rel_report)
+        report += "\n" + report_text.per_text_written.format(count=per_text_count)
 
-    _emit_progress(on_progress, "[eval] 评测完成")
+    _emit_progress(on_progress, progress.eval_complete)
     return report

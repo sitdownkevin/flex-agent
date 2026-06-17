@@ -2,33 +2,44 @@ from __future__ import annotations
 
 from typing import Any
 
+from flex_agent.i18n import get_bundle
+
 
 def _pct(val: float) -> str:
     return f"{val * 100:.1f}%"
 
 
-def _format_item_section(title: str, item_result: dict[str, Any]) -> list[str]:
+def _format_item_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
+    text = get_bundle(language).report
     macro = item_result["macro"]
     lines = [
         title,
         "-" * 60,
-        f"共同评估文本数: {item_result['common_texts']}",
-        f"仅人工: {item_result.get('skipped_human_only', 0)}  仅 Agent: {item_result.get('skipped_agent_only', 0)}",
+        text.common_texts.format(common_texts=item_result["common_texts"]),
+        text.human_agent_only.format(
+            human_only=item_result.get("skipped_human_only", 0),
+            agent_only=item_result.get("skipped_agent_only", 0),
+        ),
         "",
-        f"{'指标':<14} {'Macro-Avg':>10}",
+        text.metric_header,
         f"Consistency    {_pct(macro['consistency']):>10}",
         f"Precision      {_pct(macro['precision']):>10}",
         f"Recall         {_pct(macro['recall']):>10}",
         "",
-        (
-            f"计数: Human={macro['n_human']} Agent={macro['n_agent']} "
-            f"∩={macro['n_intersection']} ∪={macro['n_union']}"
+        text.counts.format(
+            n_human=macro["n_human"],
+            n_agent=macro["n_agent"],
+            n_intersection=macro["n_intersection"],
+            n_union=macro["n_union"],
         ),
     ]
     if "nums_both" in item_result:
         lines.append(
-            f"三分类: both={item_result['nums_both']} "
-            f"llm_only={item_result['nums_llm_only']} human_only={item_result['nums_human_only']}"
+            text.three_way.format(
+                both=item_result["nums_both"],
+                llm_only=item_result["nums_llm_only"],
+                human_only=item_result["nums_human_only"],
+            )
         )
     return lines
 
@@ -39,52 +50,60 @@ def format_open_coding_report(
     item_semantic: dict[str, Any] | None,
     coded_count: int,
     benchmark_path: str,
+    language: str | None = None,
 ) -> str:
+    text = get_bundle(language).report
     sep = "=" * 72
     lines = [
         sep,
-        "flex-agent Open Coding 质量评估",
-        "指标: JMIS Consistency / Precision / Recall",
-        f"已编码文本: {coded_count}  人工 benchmark: {benchmark_path}",
+        text.open_title,
+        text.metrics_line,
+        text.coded_and_benchmark.format(coded_count=coded_count, benchmark_path=benchmark_path),
         sep,
     ]
 
     if item_keyword is not None:
-        lines.extend(_format_item_section("一、条目层级 — 维度名匹配", item_keyword))
+        lines.extend(_format_item_section(text.open_keyword_section, item_keyword, language=language))
         lines.append("")
 
     if item_semantic is not None:
-        lines.extend(_format_item_section("二、条目层级 — 逐文本证据对齐 (LLM)", item_semantic))
+        lines.extend(_format_item_section(text.open_semantic_section, item_semantic, language=language))
         lines.append("")
 
     if item_keyword is None and item_semantic is None:
-        lines.append("未生成任何评测结果。")
+        lines.append(text.no_results)
 
     lines.append(sep)
     return "\n".join(lines)
 
 
-def _format_axial_section(title: str, item_result: dict[str, Any]) -> list[str]:
+def _format_axial_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
+    text = get_bundle(language).report
     macro = item_result["macro"]
     lines = [
         title,
         "-" * 60,
-        "评测粒度: workspace（单次全局比较，严格一对一）",
+        text.axial_granularity,
         "",
-        f"{'指标':<14} {'Macro-Avg':>10}",
+        text.metric_header,
         f"Consistency    {_pct(macro['consistency']):>10}",
         f"Precision      {_pct(macro['precision']):>10}",
         f"Recall         {_pct(macro['recall']):>10}",
         "",
-        (
-            f"计数: Human={macro['n_human']} Agent={macro['n_agent']} "
-            f"∩={macro['n_intersection']} ∪={macro['n_union']}"
+        text.counts.format(
+            n_human=macro["n_human"],
+            n_agent=macro["n_agent"],
+            n_intersection=macro["n_intersection"],
+            n_union=macro["n_union"],
         ),
     ]
     if "nums_both" in item_result:
         lines.append(
-            f"三分类: both={item_result['nums_both']} "
-            f"llm_only={item_result['nums_llm_only']} human_only={item_result['nums_human_only']}"
+            text.three_way.format(
+                both=item_result["nums_both"],
+                llm_only=item_result["nums_llm_only"],
+                human_only=item_result["nums_human_only"],
+            )
         )
     return lines
 
@@ -97,27 +116,32 @@ def format_axial_coding_report(
     benchmark_path: str,
     codebook_dimensions_count: int,
     human_category_count: int = 7,
+    language: str | None = None,
 ) -> str:
+    text = get_bundle(language).report
     sep = "=" * 72
     lines = [
         sep,
-        "flex-agent Axial Coding 质量评估",
-        "指标: JMIS Consistency / Precision / Recall",
-        f"评测粒度: workspace（codebook {codebook_dimensions_count} 维 vs {human_category_count} 类 category，严格一对一）",
-        f"已编码文本: {coded_count}  人工 benchmark: {benchmark_path}",
+        text.axial_title,
+        text.metrics_line,
+        text.axial_header_granularity.format(
+            codebook_dimensions_count=codebook_dimensions_count,
+            human_category_count=human_category_count,
+        ),
+        text.coded_and_benchmark.format(coded_count=coded_count, benchmark_path=benchmark_path),
         sep,
     ]
 
     if item_keyword is not None:
-        lines.extend(_format_axial_section("一、维度层级 — category 名匹配", item_keyword))
+        lines.extend(_format_axial_section(text.axial_keyword_section, item_keyword, language=language))
         lines.append("")
 
     if item_semantic is not None:
-        lines.extend(_format_axial_section("二、维度层级 — LLM 语义对齐", item_semantic))
+        lines.extend(_format_axial_section(text.axial_semantic_section, item_semantic, language=language))
         lines.append("")
 
     if item_keyword is None and item_semantic is None:
-        lines.append("未生成任何评测结果。")
+        lines.append(text.no_results)
 
     lines.append(sep)
     return "\n".join(lines)

@@ -6,6 +6,8 @@ from pathlib import Path
 
 from langchain_openai import ChatOpenAI
 
+from flex_agent.i18n import Language, default_prompts_name
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMPTS_ROOT = PROJECT_ROOT / "prompts"
@@ -63,7 +65,13 @@ def _validate_prompts_dir(path: Path) -> Path:
     return path
 
 
-def resolve_prompts_dir(spec: str | Path = "baseline") -> Path:
+def default_prompts_dir(language: Language | str | None = None) -> Path:
+    return (PROMPTS_ROOT / default_prompts_name(language)).resolve()
+
+
+def resolve_prompts_dir(spec: str | Path | None = "baseline", *, language: Language | str | None = None) -> Path:
+    if spec is None:
+        return _validate_prompts_dir(default_prompts_dir(language))
     return _validate_prompts_dir(_resolve_under_root(spec, root=PROMPTS_ROOT, prefix="prompts/"))
 
 
@@ -71,9 +79,9 @@ def resolve_workspace_dir(spec: str | Path = "baseline") -> Path:
     return _resolve_under_root(spec, root=WORKSPACES_ROOT, prefix="workspaces/")
 
 
-def set_prompts_dir(spec: str | Path) -> Path:
+def set_prompts_dir(spec: str | Path | None, *, language: Language | str | None = None) -> Path:
     global _active_prompts_dir
-    _active_prompts_dir = resolve_prompts_dir(spec)
+    _active_prompts_dir = resolve_prompts_dir(spec, language=language)
     return _active_prompts_dir
 
 

@@ -16,6 +16,7 @@ from flex_agent.config import (
     set_prompts_dir,
     set_workspace_dir,
 )
+from flex_agent.i18n import get_bundle, set_language
 from flex_agent.models import SessionMeta
 from flex_agent.ui.events import (
     StreamEventParser,
@@ -29,13 +30,6 @@ from flex_agent.ui.renderer import PlainCliRenderer, style, TermStyle, use_color
 from flex_agent.workspace import Workspace
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-
-ACTIVITY_LABELS = {
-    "thinking": "Agent 思考中",
-    "tool": "执行工具",
-    "streaming": "生成回复",
-}
-
 
 def _clear_stderr_line() -> None:
     if use_color():
@@ -53,7 +47,8 @@ async def _activity_spinner(stop_event: asyncio.Event, mode_holder: list[str]) -
     frame_index = 0
     while not stop_event.is_set():
         mode = mode_holder[0]
-        label = ACTIVITY_LABELS.get(mode, "运行中")
+        cli_text = get_bundle().cli
+        label = cli_text.activity_labels.get(mode, cli_text.running)
         frame = SPINNER_FRAMES[frame_index % len(SPINNER_FRAMES)]
         frame_index += 1
         if use_color():
@@ -136,12 +131,13 @@ async def _stream_agent_turn(
         await spinner
 
     if interrupted:
+        cli_text = get_bundle().cli
         update = parser.mark_interrupted()
         renderer.render_update(update, parser=parser, workspace=workspace)
         for step in update.steps.values():
             if step.status == StepStatus.ERROR and step.result_preview == "interrupted":
                 renderer.render_step(step)
-        print(style("已中断，可继续输入新指令", TermStyle.YELLOW), flush=True)
+        print(style(cli_text.interrupted, TermStyle.YELLOW), flush=True)
         renderer.render_workspace_status(workspace)
         return False
 
@@ -154,11 +150,14 @@ async def _stream_agent_turn(
 async def run_plain_cli(
     *,
     workspace_spec: str = "baseline",
-    prompts_dir_spec: str = "baseline",
+    prompts_dir_spec: str | None = None,
+    language_spec: str | None = None,
 ) -> int:
     load_env_file(PROJECT_ROOT / ".env")
-    prompts_dir = set_prompts_dir(prompts_dir_spec)
+    active_language = set_language(language_spec)
+    prompts_dir = set_prompts_dir(prompts_dir_spec, language=active_language)
     workspace_dir = set_workspace_dir(workspace_spec)
+    cli_text = get_bundle(active_language).cli
     workspace = Workspace(workspace_dir)
     workspace.ensure_layout()
     workspace.bootstrap_seed_files()
@@ -168,9 +167,10 @@ async def run_plain_cli(
             workspace_dir=path_label(workspace_dir),
             prompts_resolved=str(prompts_dir.resolve()),
             workspace_resolved=str(workspace.root.resolve()),
+            language=active_language,
         )
     )
-    agent = create_flex_agent(workspace, prompts_dir=prompts_dir)
+    agent = create_flex_agent(workspace, prompts_dir=prompts_dir, language=active_language)
     parser = StreamEventParser()
     renderer = PlainCliRenderer()
 
@@ -187,13 +187,13 @@ async def run_plain_cli(
             print(flush=True)
             continue
         except EOFError:
-            print("\nbye", flush=True)
+            print(f"\n{cli_text.bye}", flush=True)
             return 0
 
         if not user_text:
             continue
         if user_text.lower() in {"exit", "quit", "/exit", "/quit"}:
-            print("bye", flush=True)
+            print(cli_text.bye, flush=True)
             return 0
 
         handled, output = handle_slash_command(workspace, user_text)
@@ -203,7 +203,7 @@ async def run_plain_cli(
                 if cmd == "/status":
                     renderer.render_workspace_status(workspace)
                     print(output, flush=True)
-                elif cmd in {"/help", "/eval:open"}:
+                elif cmd in {"/help", "/eval:open", "/eval:axial"}:
                     print(output, flush=True)
                 elif cmd == "/clear":
                     renderer.render_update(
@@ -226,7 +226,7 @@ async def run_plain_cli(
             _clear_stderr_line()
             update = parser.mark_interrupted()
             renderer.render_update(update, parser=parser, workspace=workspace)
-            print(style("\n已中断，可继续输入新指令", TermStyle.YELLOW), flush=True)
+            print(style(f"\n{cli_text.interrupted}", TermStyle.YELLOW), flush=True)
             renderer.render_workspace_status(workspace)
         except Exception as exc:
             update = parser.mark_error(exc)

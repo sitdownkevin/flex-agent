@@ -5,6 +5,7 @@ import shutil
 import sys
 from typing import Any
 
+from flex_agent.i18n import get_bundle
 from flex_agent.ui.events import (
     StepRecord,
     StepStatus,
@@ -59,17 +60,13 @@ class PlainCliRenderer:
         self._streaming_active = False
 
     def render_banner(self, workspace: Workspace) -> None:
+        cli_text = get_bundle().cli
         title = style("flex-agent", TermStyle.BOLD)
         summary = self._workspace_summary(workspace)
         self._last_workspace_summary = summary
         self._print_line(f"{title}  workspace={workspace.root}")
         self._print_line(style(summary, TermStyle.GRAY))
-        self._print_line(
-            style(
-                "输入 open coding 任务，或 /status /tree /export /eval:open /clear /help · Esc 中断 · exit 退出",
-                TermStyle.GRAY,
-            )
-        )
+        self._print_line(style(cli_text.banner_hint, TermStyle.GRAY))
 
     def render_update(
         self,
@@ -92,12 +89,14 @@ class PlainCliRenderer:
         try:
             summary = self._workspace_summary(workspace)
         except Exception as exc:
-            self._print_line(style(f"workspace · status unavailable: {exc}", TermStyle.YELLOW))
+            text = get_bundle().cli.status_unavailable.format(error=exc)
+            self._print_line(style(text, TermStyle.YELLOW))
             return
         if summary == self._last_workspace_summary:
             return
         self._last_workspace_summary = summary
-        self._print_line(style(f"workspace · {summary}", TermStyle.GRAY))
+        prefix = get_bundle().cli.workspace_prefix
+        self._print_line(style(f"{prefix} · {summary}", TermStyle.GRAY))
 
     def reset_turn_state(self) -> None:
         self._clear_streaming_line()
@@ -199,7 +198,7 @@ class PlainCliRenderer:
         if not todos:
             return
         self._print_line()
-        self._print_line(style("Plan", TermStyle.BOLD, TermStyle.MAGENTA))
+        self._print_line(style(get_bundle().cli.plan_title, TermStyle.BOLD, TermStyle.MAGENTA))
         for item in todos:
             icon = todo_icon(item.status)
             line = f"  {icon} {item.content}"

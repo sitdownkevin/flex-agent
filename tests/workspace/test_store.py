@@ -32,10 +32,12 @@ class WorkspaceTests(unittest.TestCase):
                 random_seed=7,
                 prompts_dir="prompts/baseline",
                 workspace_dir="workspaces/test",
+                language="en",
             )
             self.assertEqual(meta.max_nums, 3)
             self.assertEqual(meta.prompts_dir, "prompts/baseline")
             self.assertEqual(meta.workspace_dir, "workspaces/test")
+            self.assertEqual(meta.language, "en")
             self.assertEqual(len(ws.load_texts()), 3)
             self.assertTrue((ws.corpus_dir / "raw.jsonl").exists())
             self.assertTrue((ws.corpus_dir / "queue.json").exists())
@@ -180,6 +182,7 @@ class WorkspaceTests(unittest.TestCase):
             assert loaded is not None
             self.assertEqual(loaded.prompts_dir, "prompts/baseline")
             self.assertEqual(loaded.workspace_dir, "workspaces/baseline")
+            self.assertEqual(loaded.language, "zh")
 
     def test_status_includes_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -191,11 +194,13 @@ class WorkspaceTests(unittest.TestCase):
                     workspace_dir="workspaces/baseline",
                     prompts_resolved="/tmp/prompts/baseline",
                     workspace_resolved="/tmp/workspaces/baseline",
+                    language="en",
                 )
             )
             status = ws.status()
             self.assertIsNotNone(status["session"])
             self.assertEqual(status["session"]["prompts_dir"], "prompts/baseline")
+            self.assertEqual(status["session"]["language"], "en")
 
     def test_save_and_load_coding(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -233,6 +238,7 @@ class ExportTests(unittest.TestCase):
                     max_nums=1,
                     codebook_nums=1,
                     kevin_batch_size=1,
+                    language="en",
                 )
             )
             ws.save_coding(
@@ -257,6 +263,7 @@ class ExportTests(unittest.TestCase):
             self.assertIn("meta", payload)
             self.assertIn("state", payload)
             self.assertEqual(payload["meta"]["finished_texts"], 1)
+            self.assertEqual(payload["meta"]["language"], "en")
             self.assertEqual(payload["meta"]["dimensions"], 1)
             self.assertEqual(len(payload["state"]["finished_texts"]), 1)
             self.assertEqual(len(payload["state"]["dimensions"]), 1)

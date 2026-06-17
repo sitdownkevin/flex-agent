@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from flex_agent.coding.agents import PromptContext, arun_alice, arun_bob, arun_kevin
 from flex_agent.coding.export import export_open_coding_result
@@ -19,6 +19,7 @@ from flex_agent.coding.quality import (
     review_dimensions,
 )
 from flex_agent.config import build_llm, get_prompts_dir, load_model_config, path_label
+from flex_agent.i18n import Language, get_bundle, get_language, resolve_language
 from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 from flex_agent.workspace import Workspace
 
@@ -57,6 +58,38 @@ class ExportInput(BaseModel):
     pass
 
 
+@dataclass(frozen=True)
+class ToolInputSchemas:
+    init_run: type[BaseModel]
+    batch_bob: type[BaseModel]
+    kevin_batch: type[BaseModel]
+
+
+def _tool_input_schemas(language: str | None = None) -> ToolInputSchemas:
+    descriptions = get_bundle(language).llm.tool_arg_descriptions
+    suffix = "Zh" if (resolve_language(language) if language is not None else get_language()) == "zh" else "En"
+    init_run = create_model(
+        f"InitRunInput{suffix}",
+        data_path=(str, Field(description=descriptions["data_path"])),
+        max_nums=(int, Field(default=10, description=descriptions["max_nums"])),
+        codebook_nums=(int, Field(default=5, description=descriptions["codebook_nums"])),
+        kevin_batch_size=(int, Field(default=5, description=descriptions["kevin_batch_size"])),
+        sample_mode=(str, Field(default="sequential", description=descriptions["sample_mode"])),
+        random_seed=(int | None, Field(default=None, description=descriptions["random_seed"])),
+        open_mode=(str, Field(default="pure", description=descriptions["open_mode"])),
+    )
+    batch_bob = create_model(
+        f"BatchBobInput{suffix}",
+        text_ids=(list[int] | None, Field(default=None, description=descriptions["text_ids"])),
+        concurrency_limit=(int, Field(default=10, description=descriptions["concurrency_limit"])),
+    )
+    kevin_batch = create_model(
+        f"KevinBatchInput{suffix}",
+        batch_index=(int | None, Field(default=None, description=descriptions["batch_index"])),
+    )
+    return ToolInputSchemas(init_run=init_run, batch_bob=batch_bob, kevin_batch=kevin_batch)
+
+
 ProgressCallback = Callable[[str], None]
 
 
@@ -72,6 +105,7 @@ class CodingToolContext:
     prompt_ctx: PromptContext
     prompts_dir_label: str
     workspace_dir_label: str
+    language: Language = "zh"
     on_progress: ProgressCallback | None = _default_bob_progress
 
 
@@ -85,6 +119,9 @@ def _tool_error(tool_name: str, exc: BaseException) -> str:
 
 
 def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
+    bundle = get_bundle(ctx.language)
+    progress = bundle.progress
+
     async def init_open_coding_run(
         data_path: str,
         max_nums: int = 10,
@@ -106,12 +143,13 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 open_mode=open_mode,
                 prompts_dir=ctx.prompts_dir_label,
                 workspace_dir=ctx.workspace_dir_label,
+                language=ctx.language,
             )
             partition = ctx.workspace.load_partition()
-            return (
-                f"Initialized run with {meta.max_nums} texts, "
-                f"codebook={len(partition.codebook_text_ids)}, "
-                f"kevin={len(partition.kevin_text_ids)}."
+            return progress.initialized_run.format(
+                max_nums=meta.max_nums,
+                codebook=len(partition.codebook_text_ids),
+                kevin=len(partition.kevin_text_ids),
             )
         except Exception as exc:
             return _tool_error("init_open_coding_run", exc)
@@ -123,7 +161,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         texts = {text.id: text for text in ctx.workspace.load_texts()}
         target_ids = text_ids or ctx.workspace.load_queue()
         if not target_ids:
-            return "No texts to code."
+            return progress.no_texts_to_code
 
         total = len(target_ids)
         limit = max(1, concurrency_limit)
@@ -137,7 +175,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
             if ctx.on_progress is not None:
                 ctx.on_progress(message)
 
-        _emit(f"[bob] 开始编码 {total} 条 (concurrency={limit})")
+        _emit(progress.bob_start.format(total=total, limit=limit))
 
         async def _record_skip(text_id: int, *, note: str | None = None) -> None:
             async with lock:
@@ -145,7 +183,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 if note is not None:
                     warnings.notes.append(note)
                 done = coded + len(skipped)
-                _emit(f"[bob] 跳过 text_id={text_id} ({done}/{total})")
+                _emit(progress.bob_skip.format(text_id=text_id, done=done, total=total))
 
         async def _code_one(text_id: int) -> None:
             nonlocal coded
@@ -184,17 +222,23 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 coded += 1
                 done = coded + len(skipped)
                 _emit(
-                    f"[bob] 完成 text_id={text_id} ({done}/{total}) "
-                    f"· items={len(output.items)}"
+                    progress.bob_done.format(
+                        text_id=text_id,
+                        done=done,
+                        total=total,
+                        items=len(output.items),
+                    )
                 )
 
         await asyncio.gather(*(_code_one(text_id) for text_id in target_ids))
         remaining = [text_id for text_id in ctx.workspace.load_queue() if text_id not in ctx.workspace.list_coded_ids()]
         ctx.workspace.save_queue(remaining)
         ctx.workspace.merge_warnings(warnings.as_dict())
-        return (
-            f"Bob coded {coded}/{len(target_ids)} texts. "
-            f"Skipped={skipped}. Remaining queue={len(remaining)}."
+        return progress.bob_summary.format(
+            coded=coded,
+            total=len(target_ids),
+            skipped=skipped,
+            remaining=len(remaining),
         )
 
     async def run_alice_codebook() -> str:
@@ -207,7 +251,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         items_pool = extract_item_pool(finished)
         if not items_pool:
             ctx.workspace.save_dimensions([])
-            return "Alice skipped: empty item pool."
+            return progress.alice_empty_pool
 
         items_details = extract_item_details(finished)
         try:
@@ -234,12 +278,12 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         reviewed, review_warnings = review_dimensions(candidate, finished)
         ctx.workspace.save_dimensions(reviewed)
         ctx.workspace.merge_warnings(review_warnings.as_dict())
-        return f"Alice wrote {len(reviewed)} dimensions to codebook/dimensions.json."
+        return progress.alice_written.format(count=len(reviewed))
 
     async def run_kevin_batches(batch_index: int | None = None) -> str:
         meta = ctx.workspace.load_run_meta()
         if meta is None:
-            return "Run not initialized."
+            return progress.run_not_initialized
 
         partition = ctx.workspace.load_partition()
         id_to_finished = {item.id: item for item in ctx.workspace.load_finished_texts()}
@@ -248,11 +292,14 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         ]
         batches = _chunked(kevin_source_ids, meta.kevin_batch_size)
         if not batches:
-            return "No Kevin batches to process."
+            return progress.no_kevin_batches
 
         if batch_index is not None:
             if batch_index < 1 or batch_index > len(batches):
-                return f"Invalid batch_index={batch_index}; valid range 1..{len(batches)}."
+                return progress.invalid_batch_index.format(
+                    batch_index=batch_index,
+                    total=len(batches),
+                )
             batches = [batches[batch_index - 1]]
             start_idx = batch_index
         else:
@@ -301,54 +348,56 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         ctx.workspace.save_dimensions(final_reviewed)
         ctx.workspace.merge_warnings(node_warnings.as_dict())
         ctx.workspace.save_queue([])
-        return f"Kevin processed {processed} batch(es); dimensions={len(final_reviewed)}."
+        return progress.kevin_summary.format(processed=processed, dimensions=len(final_reviewed))
 
     async def export_result() -> str:
         meta = ctx.workspace.load_run_meta()
         if meta is None:
-            return "Run not initialized; nothing to export."
+            return progress.export_missing_run
         output_path = export_open_coding_result(ctx.workspace)
-        return f"Exported gt-agent compatible result to {output_path}."
+        return progress.export_result.format(path=output_path)
 
     async def workspace_status() -> str:
         import json
 
         return json.dumps(ctx.workspace.status(), ensure_ascii=False, indent=2)
 
+    schemas = _tool_input_schemas(ctx.language)
+    descriptions = bundle.llm.tool_descriptions
     return [
         StructuredTool.from_function(
             coroutine=init_open_coding_run,
             name="init_open_coding_run",
-            description="Initialize corpus, partition, queue, and empty codebook in workspace files.",
-            args_schema=InitRunInput,
+            description=descriptions["init_open_coding_run"],
+            args_schema=schemas.init_run,
         ),
         StructuredTool.from_function(
             coroutine=batch_bob_code,
             name="batch_bob_code",
-            description="Concurrently run Bob coding for text ids and write coding/{id}.json files.",
-            args_schema=BatchBobInput,
+            description=descriptions["batch_bob_code"],
+            args_schema=schemas.batch_bob,
         ),
         StructuredTool.from_function(
             coroutine=run_alice_codebook,
             name="run_alice_codebook",
-            description="Build initial dimensions from codebook sample and write codebook/dimensions.json.",
+            description=descriptions["run_alice_codebook"],
         ),
         StructuredTool.from_function(
             coroutine=run_kevin_batches,
             name="run_kevin_batches",
-            description="Incrementally update codebook from Kevin batches and write batch snapshots.",
-            args_schema=KevinBatchInput,
+            description=descriptions["run_kevin_batches"],
+            args_schema=schemas.kevin_batch,
         ),
         StructuredTool.from_function(
             coroutine=export_result,
             name="export_result",
-            description="Aggregate workspace files into gt-agent compatible exports/open_coding_result_*.json.",
+            description=descriptions["export_result"],
             args_schema=ExportInput,
         ),
         StructuredTool.from_function(
             coroutine=workspace_status,
             name="workspace_status",
-            description="Return current workspace counters and run metadata as JSON.",
+            description=descriptions["workspace_status"],
         ),
     ]
 
@@ -357,7 +406,9 @@ def create_coding_tool_context(
     workspace: Workspace,
     *,
     prompts_dir: Path | None = None,
+    language: str | None = None,
 ) -> CodingToolContext:
+    active_language = resolve_language(language) if language is not None else get_language()
     model_cfg = load_model_config()
     llm = build_llm(
         model_cfg.default_model,
@@ -376,8 +427,9 @@ def create_coding_tool_context(
         workspace=workspace,
         llm=llm,
         llm_pro=llm_pro,
-        prompt_ctx=PromptContext.load(resolved_prompts),
+        prompt_ctx=PromptContext.load(resolved_prompts, language=active_language),
         prompts_dir_label=path_label(resolved_prompts),
         workspace_dir_label=path_label(workspace.root),
+        language=active_language,
         on_progress=_default_bob_progress,
     )
