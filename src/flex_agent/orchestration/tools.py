@@ -44,7 +44,7 @@ class BatchBobInput(BaseModel):
         default=None,
         description="Optional explicit text ids. Defaults to all texts in queue.",
     )
-    concurrency_limit: int = Field(default=10, description="Max concurrent Bob calls.")
+    concurrency_limit: int = Field(default=50, description="Max concurrent Bob calls.")
 
 
 class KevinBatchInput(BaseModel):
