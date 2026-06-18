@@ -306,6 +306,7 @@ class Workspace:
             "nums_human_only",
             "nums_both",
             "macro",
+            "micro",
             "alignment",
         }
         return {

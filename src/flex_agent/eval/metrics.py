@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flex_agent.eval.core import EvalMetrics, normalize_dimension
+from flex_agent.eval.core import EvalMetrics, micro_from_counts, normalize_dimension
 
 
 def compute_item_metrics_simple(
@@ -18,6 +18,7 @@ def compute_item_metrics_simple(
             "nums_human_only": 0,
             "nums_both": 0,
             "macro": EvalMetrics().as_dict(),
+            "micro": EvalMetrics().as_dict(),
             "per_text": [],
         }
 
@@ -79,5 +80,6 @@ def compute_item_metrics_simple(
         "nums_human_only": total_human_only,
         "nums_both": total_both,
         "macro": macro.as_dict(),
+        "micro": micro_from_counts(total_both, total_llm_only, total_human_only).as_dict(),
         "per_text": per_text_results,
     }

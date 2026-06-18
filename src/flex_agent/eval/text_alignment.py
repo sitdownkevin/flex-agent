@@ -12,7 +12,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field, create_model
 
-from flex_agent.eval.core import EvalMetrics, normalize_dimension
+from flex_agent.eval.core import EvalMetrics, micro_from_counts, normalize_dimension
 from flex_agent.eval.prompts import text_alignment_prompt
 from flex_agent.i18n import Language, get_bundle, get_language, resolve_language
 
@@ -126,18 +126,7 @@ def _agent_items_for_prompt(agent_items_raw: list[dict]) -> list[dict[str, Any]]
 
 
 def _counts_to_metrics(nums_both: int, nums_llm_only: int, nums_human_only: int) -> EvalMetrics:
-    n_agent = nums_both + nums_llm_only
-    n_human = nums_both + nums_human_only
-    n_union = nums_both + nums_llm_only + nums_human_only
-    return EvalMetrics(
-        consistency=nums_both / n_union if n_union else 0.0,
-        precision=nums_both / n_agent if n_agent else 0.0,
-        recall=nums_both / n_human if n_human else 0.0,
-        n_human=n_human,
-        n_agent=n_agent,
-        n_intersection=nums_both,
-        n_union=n_union,
-    )
+    return micro_from_counts(nums_both, nums_llm_only, nums_human_only)
 
 
 def _aggregate_semantic_metrics(
@@ -191,6 +180,7 @@ def _aggregate_semantic_metrics(
         "nums_human_only": total_human_only,
         "nums_both": total_both,
         "macro": macro.as_dict(),
+        "micro": micro_from_counts(total_both, total_llm_only, total_human_only).as_dict(),
         "per_text": per_text,
         "alignment": {
             text_id: all_alignments.get(text_id, {})

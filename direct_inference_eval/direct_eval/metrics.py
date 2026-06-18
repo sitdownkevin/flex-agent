@@ -14,6 +14,7 @@ from .llm import LLMClient
 from .parser import extract_json_payload
 from .schemas import HumanRecord, PredictionRecord
 from flex_agent.i18n import get_bundle
+from flex_agent.eval.core import micro_from_counts
 
 GLOBAL_AXIAL_TEXT_ID = 0
 
@@ -115,6 +116,7 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "nums_human_only": 0,
             "nums_both": 0,
             "macro": empty,
+            "micro": empty,
             "per_text": [],
         }
 
@@ -140,6 +142,7 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "nums_human_only": total_human_only,
         "nums_both": total_both,
         "macro": macro.as_dict(),
+        "micro": micro_from_counts(total_both, total_llm_only, total_human_only).as_dict(),
         "per_text": rows,
     }
 

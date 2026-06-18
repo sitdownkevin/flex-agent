@@ -47,6 +47,26 @@ class EvalMetrics:
         }
 
 
+def micro_from_counts(
+    nums_both: int,
+    nums_llm_only: int,
+    nums_human_only: int,
+) -> EvalMetrics:
+    """Compute pooled (micro) CPR metrics from aggregate item counts."""
+    n_agent = nums_both + nums_llm_only
+    n_human = nums_both + nums_human_only
+    n_union = nums_both + nums_llm_only + nums_human_only
+    return EvalMetrics(
+        consistency=nums_both / n_union if n_union else 0.0,
+        precision=nums_both / n_agent if n_agent else 0.0,
+        recall=nums_both / n_human if n_human else 0.0,
+        n_human=n_human,
+        n_agent=n_agent,
+        n_intersection=nums_both,
+        n_union=n_union,
+    )
+
+
 def normalize_dimension(dim: str) -> str:
     """Normalize a dimension name through alias tables."""
     dim = dim.strip()

@@ -9,6 +9,16 @@ def _pct(val: float) -> str:
     return f"{val * 100:.1f}%"
 
 
+def _format_metric_rows(item_result: dict[str, Any]) -> list[str]:
+    macro = item_result["macro"]
+    micro = item_result.get("micro", macro)
+    return [
+        f"Consistency    {_pct(macro['consistency']):>10} {_pct(micro['consistency']):>10}",
+        f"Precision      {_pct(macro['precision']):>10} {_pct(micro['precision']):>10}",
+        f"Recall         {_pct(macro['recall']):>10} {_pct(micro['recall']):>10}",
+    ]
+
+
 def _format_item_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
     text = get_bundle(language).report
     macro = item_result["macro"]
@@ -22,9 +32,7 @@ def _format_item_section(title: str, item_result: dict[str, Any], *, language: s
         ),
         "",
         text.metric_header,
-        f"Consistency    {_pct(macro['consistency']):>10}",
-        f"Precision      {_pct(macro['precision']):>10}",
-        f"Recall         {_pct(macro['recall']):>10}",
+        *_format_metric_rows(item_result),
         "",
         text.counts.format(
             n_human=macro["n_human"],
@@ -86,9 +94,7 @@ def _format_axial_section(title: str, item_result: dict[str, Any], *, language: 
         text.axial_granularity,
         "",
         text.metric_header,
-        f"Consistency    {_pct(macro['consistency']):>10}",
-        f"Precision      {_pct(macro['precision']):>10}",
-        f"Recall         {_pct(macro['recall']):>10}",
+        *_format_metric_rows(item_result),
         "",
         text.counts.format(
             n_human=macro["n_human"],

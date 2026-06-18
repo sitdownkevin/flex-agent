@@ -1,4 +1,4 @@
-"""Aggregate per-text eval results into macro CPR metrics."""
+"""Aggregate per-text eval results into macro and micro CPR metrics."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from flex_agent.eval.core import EvalMetrics
+from flex_agent.eval.core import EvalMetrics, micro_from_counts
 from flex_agent.eval.semantic_metrics import build_semantic_row
 
 
@@ -19,6 +19,7 @@ def _aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "nums_human_only": 0,
             "nums_both": 0,
             "macro": empty,
+            "micro": empty,
             "per_text": [],
         }
 
@@ -44,6 +45,7 @@ def _aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "nums_human_only": total_human_only,
         "nums_both": total_both,
         "macro": macro.as_dict(),
+        "micro": micro_from_counts(total_both, total_llm_only, total_human_only).as_dict(),
         "per_text": rows,
     }
 

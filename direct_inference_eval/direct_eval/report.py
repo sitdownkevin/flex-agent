@@ -73,6 +73,16 @@ def format_axial_report(
     return "\n".join(lines)
 
 
+def _format_metric_rows(item_result: dict[str, Any]) -> list[str]:
+    macro = item_result["macro"]
+    micro = item_result.get("micro", macro)
+    return [
+        f"Consistency    {pct(macro['consistency']):>10} {pct(micro['consistency']):>10}",
+        f"Precision      {pct(macro['precision']):>10} {pct(micro['precision']):>10}",
+        f"Recall         {pct(macro['recall']):>10} {pct(micro['recall']):>10}",
+    ]
+
+
 def _format_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
     text = get_bundle(language).report
     macro = item_result["macro"]
@@ -82,9 +92,7 @@ def _format_section(title: str, item_result: dict[str, Any], *, language: str | 
         text.common_texts.format(common_texts=item_result["common_texts"]),
         "",
         text.metric_header,
-        f"Consistency    {pct(macro['consistency']):>10}",
-        f"Precision      {pct(macro['precision']):>10}",
-        f"Recall         {pct(macro['recall']):>10}",
+        *_format_metric_rows(item_result),
         "",
         text.counts.format(
             n_human=macro["n_human"],

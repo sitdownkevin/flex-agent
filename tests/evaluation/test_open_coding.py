@@ -75,6 +75,21 @@ class ComputeItemMetricsSimpleTests(unittest.TestCase):
         result = compute_item_metrics_simple(human, agent)
         self.assertEqual(result["macro"]["n_intersection"], 1)
         self.assertEqual(result["macro"]["consistency"], 0.25)
+        self.assertEqual(result["micro"]["precision"], 0.5)
+        self.assertAlmostEqual(result["micro"]["recall"], 1 / 3, places=4)
+
+    def test_macro_vs_micro_across_texts(self) -> None:
+        human = {
+            1: {"画面": 1},
+            2: {"画面": 1, "态度": 1, "趣味性": 1},
+        }
+        agent = {
+            1: {"画面": 1},
+            2: {"画面": 1, "价格": 1},
+        }
+        result = compute_item_metrics_simple(human, agent)
+        self.assertEqual(result["macro"]["precision"], 0.75)
+        self.assertAlmostEqual(result["micro"]["precision"], 2 / 3, places=4)
 
 
 class EvalPromptTests(unittest.TestCase):
