@@ -103,7 +103,7 @@ async def batch_semantic_judge(
                 agg = aggregate_eval_results(workspace.eval_open_dir)
                 semantic_agg = agg.get("item_level_semantic")
                 if on_progress is not None and semantic_agg:
-                    macro = semantic_agg["macro"]
+                    micro = semantic_agg["micro"]
                     complete = agg["semantic_complete"]
                     on_progress(
                         progress.semantic_progress.format(
@@ -111,9 +111,9 @@ async def batch_semantic_judge(
                             pending=len(pending),
                             complete=complete,
                             total=total_pairs,
-                            consistency=macro["consistency"],
-                            precision=macro["precision"],
-                            recall=macro["recall"],
+                            consistency=micro["consistency"],
+                            precision=micro["precision"],
+                            recall=micro["recall"],
                         )
                     )
 

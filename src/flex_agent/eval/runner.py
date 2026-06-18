@@ -186,13 +186,13 @@ def evaluate_workspace(
         )
         agg = aggregate_eval_results(workspace.eval_open_dir)
         if agg.get("item_level_keyword"):
-            macro = agg["item_level_keyword"]["macro"]
+            micro = agg["item_level_keyword"]["micro"]
             _emit_progress(
                 on_progress,
                 progress.eval_keyword_macro.format(
-                    consistency=macro["consistency"],
-                    precision=macro["precision"],
-                    recall=macro["recall"],
+                    consistency=micro["consistency"],
+                    precision=micro["precision"],
+                    recall=micro["recall"],
                 ),
             )
 
@@ -216,13 +216,13 @@ def evaluate_workspace(
         )
         agg = aggregate_eval_results(workspace.eval_open_dir)
         if agg.get("item_level_semantic"):
-            macro = agg["item_level_semantic"]["macro"]
+            micro = agg["item_level_semantic"]["micro"]
             _emit_progress(
                 on_progress,
                 progress.eval_semantic_macro.format(
-                    consistency=macro["consistency"],
-                    precision=macro["precision"],
-                    recall=macro["recall"],
+                    consistency=micro["consistency"],
+                    precision=micro["precision"],
+                    recall=micro["recall"],
                     complete=agg["semantic_complete"],
                     total=len(pairs),
                 ),

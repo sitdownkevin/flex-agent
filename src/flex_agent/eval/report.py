@@ -10,18 +10,17 @@ def _pct(val: float) -> str:
 
 
 def _format_metric_rows(item_result: dict[str, Any]) -> list[str]:
-    macro = item_result["macro"]
-    micro = item_result.get("micro", macro)
+    micro = item_result.get("micro", item_result["macro"])
     return [
-        f"Consistency    {_pct(macro['consistency']):>10} {_pct(micro['consistency']):>10}",
-        f"Precision      {_pct(macro['precision']):>10} {_pct(micro['precision']):>10}",
-        f"Recall         {_pct(macro['recall']):>10} {_pct(micro['recall']):>10}",
+        f"Consistency    {_pct(micro['consistency']):>10}",
+        f"Precision      {_pct(micro['precision']):>10}",
+        f"Recall         {_pct(micro['recall']):>10}",
     ]
 
 
 def _format_item_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
     text = get_bundle(language).report
-    macro = item_result["macro"]
+    micro = item_result.get("micro", item_result["macro"])
     lines = [
         title,
         "-" * 60,
@@ -35,10 +34,10 @@ def _format_item_section(title: str, item_result: dict[str, Any], *, language: s
         *_format_metric_rows(item_result),
         "",
         text.counts.format(
-            n_human=macro["n_human"],
-            n_agent=macro["n_agent"],
-            n_intersection=macro["n_intersection"],
-            n_union=macro["n_union"],
+            n_human=micro["n_human"],
+            n_agent=micro["n_agent"],
+            n_intersection=micro["n_intersection"],
+            n_union=micro["n_union"],
         ),
     ]
     if "nums_both" in item_result:
@@ -87,7 +86,7 @@ def format_open_coding_report(
 
 def _format_axial_section(title: str, item_result: dict[str, Any], *, language: str | None = None) -> list[str]:
     text = get_bundle(language).report
-    macro = item_result["macro"]
+    micro = item_result.get("micro", item_result["macro"])
     lines = [
         title,
         "-" * 60,
@@ -97,10 +96,10 @@ def _format_axial_section(title: str, item_result: dict[str, Any], *, language: 
         *_format_metric_rows(item_result),
         "",
         text.counts.format(
-            n_human=macro["n_human"],
-            n_agent=macro["n_agent"],
-            n_intersection=macro["n_intersection"],
-            n_union=macro["n_union"],
+            n_human=micro["n_human"],
+            n_agent=micro["n_agent"],
+            n_intersection=micro["n_intersection"],
+            n_union=micro["n_union"],
         ),
     ]
     if "nums_both" in item_result:
