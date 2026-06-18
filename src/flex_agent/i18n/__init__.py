@@ -170,7 +170,7 @@ ZH_ORCHESTRATOR_PROMPT = """你是 flex-agent 主编排器，负责自主完成 
 2. 所有编码状态必须持久化到 workspace 文件，不要只在对话里保存结果。
 3. 优先调用专用 Python 工具执行批量步骤；必要时再用 `task` 调度子 Agent 做语义判断。
 4. 每完成一个阶段，用 `workspace_status` 或 `read_file` 核对文件状态。
-5. 全部完成后调用 `export_result` 导出 gt-agent 兼容 JSON。
+5. 全部完成后调用 `export_result` 导出 code-agent 兼容 JSON。
 6. 某步工具返回 failed/error 时，分析原因并自动重试或调整参数后继续，不要停下来等用户说 continue。
 7. 禁止用 `write_file`/`edit_file` 修改 `corpus/partition.json`、`corpus/queue.json`、`corpus/raw.jsonl`；这些只能由 `init_open_coding_run` 写入。
 
@@ -220,7 +220,7 @@ EN_ORCHESTRATOR_PROMPT = """You are the flex-agent orchestrator. Your job is to 
 2. All coding state must be persisted to workspace files; do not keep results only in the conversation.
 3. Prefer the dedicated Python tools for batch steps; use `task` subagents only when semantic judgment or file review is needed.
 4. After each phase, verify file state with `workspace_status` or `read_file`.
-5. When the run is complete, call `export_result` to create the gt-agent compatible JSON export.
+5. When the run is complete, call `export_result` to create the code-agent compatible JSON export.
 6. If a step returns failed/error, analyze the cause, retry or adjust parameters, and continue without waiting for the user to say continue.
 7. Do not use `write_file` or `edit_file` to modify `corpus/partition.json`, `corpus/queue.json`, or `corpus/raw.jsonl`; only `init_open_coding_run` may write those files.
 
@@ -324,7 +324,7 @@ ZH_BUNDLE = TextBundle(
             "batch_bob_code": "并发运行 Bob 对 text id 编码，并写入 coding/{id}.json 文件。",
             "run_alice_codebook": "基于 codebook 样本构建初始 dimensions，并写入 codebook/dimensions.json。",
             "run_kevin_batches": "从 Kevin 批次增量更新代码本，并写入批次快照。",
-            "export_result": "将 workspace 文件聚合为 gt-agent 兼容的 exports/open_coding_result_*.json。",
+            "export_result": "将 workspace 文件聚合为 code-agent 兼容的 exports/open_coding_result_*.json。",
             "workspace_status": "以 JSON 返回当前 workspace 计数与运行元数据。",
         },
         eval_semantic_warning="  [warn] semantic evidence alignment LLM call failed: {error!r}",
@@ -442,7 +442,7 @@ ZH_BUNDLE = TextBundle(
         invalid_batch_index="Invalid batch_index={batch_index}; valid range 1..{total}.",
         kevin_summary="Kevin processed {processed} batch(es); dimensions={dimensions}.",
         export_missing_run="Run not initialized; nothing to export.",
-        export_result="Exported gt-agent compatible result to {path}.",
+        export_result="Exported code-agent compatible result to {path}.",
         eval_no_results="尚无评测结果。请先运行 /eval:open。",
         eval_benchmark_missing="人工 benchmark 未就绪。请确认 flex-agent/data/ 下种子文件存在，并重新启动 CLI。",
         eval_no_coded_texts="尚无已编码文本。请先运行 Bob 编码（batch_bob_code）后再评测。",
@@ -560,7 +560,7 @@ EN_BUNDLE = TextBundle(
             "batch_bob_code": "Concurrently run Bob coding for text ids and write coding/{id}.json files.",
             "run_alice_codebook": "Build initial dimensions from the codebook sample and write codebook/dimensions.json.",
             "run_kevin_batches": "Incrementally update the codebook from Kevin batches and write batch snapshots.",
-            "export_result": "Aggregate workspace files into gt-agent compatible exports/open_coding_result_*.json.",
+            "export_result": "Aggregate workspace files into code-agent compatible exports/open_coding_result_*.json.",
             "workspace_status": "Return current workspace counters and run metadata as JSON.",
         },
         eval_semantic_warning="  [warn] semantic evidence alignment LLM call failed: {error!r}",
@@ -678,7 +678,7 @@ EN_BUNDLE = TextBundle(
         invalid_batch_index="Invalid batch_index={batch_index}; valid range 1..{total}.",
         kevin_summary="Kevin processed {processed} batch(es); dimensions={dimensions}.",
         export_missing_run="Run not initialized; nothing to export.",
-        export_result="Exported gt-agent compatible result to {path}.",
+        export_result="Exported code-agent compatible result to {path}.",
         eval_no_results="No evaluation results yet. Run /eval:open first.",
         eval_benchmark_missing="Human benchmark is not ready. Confirm the seed files exist under flex-agent/data/ and restart the CLI.",
         eval_no_coded_texts="No coded texts yet. Run Bob coding (batch_bob_code) before evaluation.",
