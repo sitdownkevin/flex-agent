@@ -12,18 +12,18 @@ def build_parser() -> argparse.ArgumentParser:
     cli_text = get_bundle().cli
     parser = argparse.ArgumentParser(description=cli_text.parser_description)
     parser.add_argument(
-        "--workspace",
+        "-w", "--workspace",
         default="baseline",
         help=cli_text.workspace_help,
     )
     parser.add_argument(
-        "--prompts-dir",
+        "-p", "--prompts-dir",
         default=None,
         dest="prompts_dir",
         help=cli_text.prompts_dir_help,
     )
     parser.add_argument(
-        "--language",
+        "-l", "--language",
         choices=("zh", "en"),
         default=None,
         help=cli_text.language_help,
