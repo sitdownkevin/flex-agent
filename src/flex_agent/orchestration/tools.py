@@ -464,7 +464,10 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         if meta is None:
             return progress.export_missing_run
         output_path = export_open_coding_result(ctx.workspace)
-        return progress.export_result.format(path=output_path)
+        # Return a virtual path starting with / so that the agent can access it easily
+        # under virtual_mode=True on both Windows and macOS.
+        virtual_path = f"/{path_label(output_path, root=ctx.workspace.root)}"
+        return progress.export_result.format(path=virtual_path)
 
     async def workspace_status() -> str:
         import json

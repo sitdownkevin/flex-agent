@@ -102,17 +102,22 @@ class Workspace:
 
     def resolve_data_path(self, data_path: str | Path) -> Path:
         """Map agent virtual paths (e.g. /corpus/foo.jsonl) to workspace files."""
+        # Normalize the input path to strip any leading slashes or backslashes
+        # so that it is always treated as relative to the workspace root.
+        path_str = str(data_path).replace("\\", "/").lstrip("/")
+        
+        # If it's an absolute path on the host system (e.g. C:\... or /usr/...),
+        # try to resolve it directly if it exists.
         raw = Path(data_path)
-        if raw.is_absolute():
-            if raw.exists():
-                return raw.resolve()
-            virtual = (self.root / raw.as_posix().lstrip("/")).resolve()
-            if virtual.exists():
-                return virtual
-            return raw
-        workspace_relative = (self.root / raw).resolve()
+        if raw.is_absolute() and raw.exists():
+            return raw.resolve()
+            
+        # Otherwise, resolve relative to workspace root
+        workspace_relative = (self.root / path_str).resolve()
         if workspace_relative.exists():
             return workspace_relative
+            
+        # Fallback to direct resolution
         return raw.resolve()
 
     def _read_json(self, path: Path, default):
