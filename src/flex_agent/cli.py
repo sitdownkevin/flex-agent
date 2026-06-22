@@ -28,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=cli_text.language_help,
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging for graph steps and tool calls.",
+    )
     return parser
 
 
@@ -38,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             workspace_spec=args.workspace,
             prompts_dir_spec=args.prompts_dir,
             language_spec=args.language,
+            debug=args.debug,
         )
     )
 

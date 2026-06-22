@@ -7,6 +7,7 @@ from deepagents.backends import CompositeBackend, FilesystemBackend, StateBacken
 from langgraph.checkpoint.memory import MemorySaver
 
 from flex_agent.config import build_llm, load_model_config
+from flex_agent.debug_log import agent_debug_log
 from flex_agent.i18n import get_language, resolve_language
 from flex_agent.orchestration.prompt import orchestrator_prompt
 from flex_agent.orchestration.subagents import build_subagents
@@ -61,6 +62,22 @@ def create_flex_agent(
     )
     workspace.ensure_layout()
     workspace.bootstrap_seed_files()
+    # region agent log
+    agent_debug_log(
+        hypothesis_id="H3,H5",
+        location="src/flex_agent/orchestration/factory.py:create_flex_agent",
+        message="creating deep agent",
+        data={
+            "language": ctx.language,
+            "workspace_root": str(workspace.root.resolve()),
+            "prompts_dir": ctx.prompts_dir_label,
+            "default_model": model_cfg.default_model,
+            "pro_model": model_cfg.pro_model,
+            "seed": model_cfg.seed,
+            "checkpointer_id": id(_CHECKPOINTER),
+        },
+    )
+    # endregion
     return create_deep_agent(
         model=model,
         tools=build_coding_tools(ctx),

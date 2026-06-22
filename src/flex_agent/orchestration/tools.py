@@ -23,6 +23,7 @@ from flex_agent.coding.quality import (
     normalize_finished_text,
 )
 from flex_agent.config import build_llm, get_prompts_dir, load_model_config, path_label
+from flex_agent.debug_log import agent_debug_log
 from flex_agent.i18n import Language, get_bundle, get_language, resolve_language
 from flex_agent.models import DimensionDetail, FinishedItemDetail, FinishedTextItem
 from flex_agent.orchestration.harness import (
@@ -150,9 +151,72 @@ def _tool_error(tool_name: str, exc: BaseException) -> str:
     return f"{tool_name} failed: {type(exc).__name__}: {exc}"
 
 
+def _workspace_debug_counts(workspace: Workspace) -> dict[str, object]:
+    try:
+        status = workspace.status()
+    except Exception as exc:
+        return {"status_error": repr(exc)}
+    return {
+        "root": str(workspace.root.resolve()),
+        "texts": status.get("texts_total"),
+        "queue": status.get("queue_remaining"),
+        "coded": status.get("coded_count"),
+        "dimensions": status.get("dimensions_count"),
+        "run_initialized": status.get("run") is not None,
+    }
+
+
 def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
     bundle = get_bundle(ctx.language)
     progress = bundle.progress
+
+    def _logged_tool(tool_name: str, coroutine):
+        async def wrapped(**kwargs):
+            # region agent log
+            agent_debug_log(
+                hypothesis_id="H1,H2",
+                location="src/flex_agent/orchestration/tools.py:tool_entry",
+                message="custom tool entry",
+                data={
+                    "tool_name": tool_name,
+                    "args": kwargs,
+                    "workspace": _workspace_debug_counts(ctx.workspace),
+                },
+            )
+            # endregion
+            try:
+                result = await coroutine(**kwargs)
+            except Exception as exc:
+                # region agent log
+                agent_debug_log(
+                    hypothesis_id="H1,H2",
+                    location="src/flex_agent/orchestration/tools.py:tool_exception",
+                    message="custom tool exception",
+                    data={
+                        "tool_name": tool_name,
+                        "error_type": type(exc).__name__,
+                        "error": repr(exc),
+                        "workspace": _workspace_debug_counts(ctx.workspace),
+                    },
+                )
+                # endregion
+                raise
+            # region agent log
+            agent_debug_log(
+                hypothesis_id="H1,H2",
+                location="src/flex_agent/orchestration/tools.py:tool_exit",
+                message="custom tool exit",
+                data={
+                    "tool_name": tool_name,
+                    "result_preview": str(result)[:300],
+                    "is_tool_error": isinstance(result, str) and " failed: " in result,
+                    "workspace": _workspace_debug_counts(ctx.workspace),
+                },
+            )
+            # endregion
+            return result
+
+        return wrapped
 
     async def init_open_coding_run(
         data_path: str,
@@ -411,55 +475,55 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
     descriptions = bundle.llm.tool_descriptions
     return [
         StructuredTool.from_function(
-            coroutine=init_open_coding_run,
+            coroutine=_logged_tool("init_open_coding_run", init_open_coding_run),
             name="init_open_coding_run",
             description=descriptions["init_open_coding_run"],
             args_schema=schemas.init_run,
         ),
         StructuredTool.from_function(
-            coroutine=batch_open_coding,
+            coroutine=_logged_tool("batch_open_coding", batch_open_coding),
             name="batch_open_coding",
             description=descriptions["batch_open_coding"],
             args_schema=schemas.batch_open_coding,
         ),
         StructuredTool.from_function(
-            coroutine=run_construct_induction,
+            coroutine=_logged_tool("run_construct_induction", run_construct_induction),
             name="run_construct_induction",
             description=descriptions["run_construct_induction"],
             args_schema=ConstructInductionInput,
         ),
         StructuredTool.from_function(
-            coroutine=run_axial_coding,
+            coroutine=_logged_tool("run_axial_coding", run_axial_coding),
             name="run_axial_coding",
             description=descriptions["run_axial_coding"],
             args_schema=schemas.axial_coding_batch,
         ),
         StructuredTool.from_function(
-            coroutine=batch_bob_code,
+            coroutine=_logged_tool("batch_bob_code", batch_bob_code),
             name="batch_bob_code",
             description="Compatibility alias for batch_open_coding.",
             args_schema=schemas.batch_open_coding,
         ),
         StructuredTool.from_function(
-            coroutine=run_alice_codebook,
+            coroutine=_logged_tool("run_alice_codebook", run_alice_codebook),
             name="run_alice_codebook",
             description="Compatibility alias for run_construct_induction.",
             args_schema=ConstructInductionInput,
         ),
         StructuredTool.from_function(
-            coroutine=run_kevin_batches,
+            coroutine=_logged_tool("run_kevin_batches", run_kevin_batches),
             name="run_kevin_batches",
             description="Compatibility alias for run_axial_coding.",
             args_schema=schemas.axial_coding_batch,
         ),
         StructuredTool.from_function(
-            coroutine=export_result,
+            coroutine=_logged_tool("export_result", export_result),
             name="export_result",
             description=descriptions["export_result"],
             args_schema=ExportInput,
         ),
         StructuredTool.from_function(
-            coroutine=workspace_status,
+            coroutine=_logged_tool("workspace_status", workspace_status),
             name="workspace_status",
             description=descriptions["workspace_status"],
             args_schema=WorkspaceStatusInput,

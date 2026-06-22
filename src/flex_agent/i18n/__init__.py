@@ -396,10 +396,10 @@ ZH_BUNDLE = TextBundle(
             "ls": "列出目录",
             "execute": "执行命令",
         },
-        parser_description="flex-agent 交互式开放编码 CLI",
-        workspace_help="Workspace 分类或路径（默认：baseline -> workspaces/baseline）。",
-        prompts_dir_help="Prompt 集名称或路径。zh 默认 baseline，en 默认 baseline_en。",
-        language_help="提示词、报告和代码侧文案语言（默认：zh 或 FLEX_AGENT_LANGUAGE）。",
+        parser_description="flex-agent interactive open coding CLI",
+        workspace_help="Workspace category or path (default: baseline -> workspaces/baseline).",
+        prompts_dir_help="Prompt set name or path. Defaults to baseline for zh and baseline_en for en.",
+        language_help="Language for prompts, reports, and code-side text (default: zh or FLEX_AGENT_LANGUAGE).",
         banner_hint="输入 open coding 任务，或 /status /tree /export /eval:open /clear /help · Esc 中断 · exit 退出",
         help_text="\n".join(
             [

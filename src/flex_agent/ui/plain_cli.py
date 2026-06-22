@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import platform
 import sys
 from pathlib import Path
 from time import strftime
@@ -20,6 +21,7 @@ from flex_agent.config import (
     trace_invoke_config,
     warn_langsmith_tracing,
 )
+from flex_agent.debug_log import agent_debug_log, configure_debug_logging
 from flex_agent.i18n import get_bundle, set_language
 from flex_agent.models import SessionMeta
 from flex_agent.ui.events import (
@@ -34,6 +36,25 @@ from flex_agent.ui.renderer import PlainCliRenderer, style, TermStyle, use_color
 from flex_agent.workspace import Workspace
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+def _chunk_debug_summary(chunk: dict[str, Any]) -> dict[str, Any]:
+    messages = chunk.get("messages", [])
+    last = messages[-1] if messages else None
+    tool_calls = getattr(last, "tool_calls", None) or []
+    return {
+        "message_count": len(messages) if isinstance(messages, list) else None,
+        "last_message_type": last.__class__.__name__ if last is not None else None,
+        "last_tool_calls": [
+            {
+                "name": str(call.get("name") or "unknown"),
+                "id": str(call.get("id") or ""),
+            }
+            for call in tool_calls
+            if isinstance(call, dict)
+        ],
+        "todos_count": len(chunk.get("todos") or []) if isinstance(chunk.get("todos"), list) else None,
+    }
 
 def _clear_stderr_line() -> None:
     if use_color():
@@ -87,9 +108,41 @@ async def _stream_agent_turn(
     watcher = EscInterruptWatcher()
     watcher.start()
     renderer.reset_turn_state()
+    # region agent log
+    agent_debug_log(
+        hypothesis_id="H1,H2,H3,H4,H5",
+        location="src/flex_agent/ui/plain_cli.py:_stream_agent_turn:start",
+        message="agent turn start",
+        data={
+            "platform": platform.platform(),
+            "python": sys.version.split()[0],
+            "cwd": str(Path.cwd()),
+            "workspace_root": str(workspace.root.resolve()),
+            "recursion_limit": config.get("recursion_limit"),
+            "thread_id": (config.get("configurable") or {}).get("thread_id")
+            if isinstance(config.get("configurable"), dict)
+            else None,
+            "user_text_length": len(user_text),
+            "watcher_enabled": watcher.enabled,
+        },
+    )
+    # endregion
 
     async def _consume() -> None:
+        chunk_index = 0
         async for chunk in agent.astream(inputs, config=config, stream_mode="values"):
+            chunk_index += 1
+            # region agent log
+            agent_debug_log(
+                hypothesis_id="H2,H3",
+                location="src/flex_agent/ui/plain_cli.py:_stream_agent_turn:chunk",
+                message="graph stream chunk",
+                data={
+                    "chunk_index": chunk_index,
+                    **_chunk_debug_summary(chunk),
+                },
+            )
+            # endregion
             update = parser.consume(chunk)
             if update.activity_mode:
                 activity_mode[0] = update.activity_mode
@@ -156,8 +209,10 @@ async def run_plain_cli(
     workspace_spec: str = "baseline",
     prompts_dir_spec: str | None = None,
     language_spec: str | None = None,
+    debug: bool = False,
 ) -> int:
     load_env_file(PROJECT_ROOT / ".env")
+    log_path = configure_debug_logging(enabled=debug)
     warn_langsmith_tracing()
     active_language = set_language(language_spec)
     prompts_dir = set_prompts_dir(prompts_dir_spec, language=active_language)
@@ -189,6 +244,8 @@ async def run_plain_cli(
     )
 
     renderer.render_banner(workspace)
+    if debug:
+        print(f"Debug logging enabled: {log_path}", file=sys.stderr, flush=True)
 
     while True:
         try:
@@ -241,6 +298,22 @@ async def run_plain_cli(
             renderer.render_workspace_status(workspace)
         except Exception as exc:
             update = parser.mark_error(exc)
+            # region agent log
+            agent_debug_log(
+                hypothesis_id="H2,H3,H4",
+                location="src/flex_agent/ui/plain_cli.py:run_plain_cli:error",
+                message="agent turn error",
+                data={
+                    "error_type": type(exc).__name__,
+                    "error": repr(exc),
+                    "running_steps": [
+                        {"tool_name": step.tool_name, "summary": step.summary}
+                        for step in parser.steps.values()
+                        if step.status == StepStatus.RUNNING
+                    ],
+                },
+            )
+            # endregion
             renderer.render_update(update, parser=parser, workspace=workspace)
             for step in update.steps.values():
                 if step.status == StepStatus.ERROR:
