@@ -11,32 +11,40 @@ interface TimelineProps {
 export function Timeline({ entry, step }: TimelineProps) {
   if (entry.kind === "user") {
     return (
-      <Typography
+      <Box
         sx={{
-          color: terminalColors.cyan,
-          fontWeight: 700,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          mb: 0.5,
+          mb: 1,
+          pl: 1.25,
+          borderLeft: `2px solid ${terminalColors.cyan}`,
         }}
       >
-        {`> ${entry.text}`}
-      </Typography>
+        <Typography
+          sx={{
+            color: terminalColors.cyan,
+            fontWeight: 700,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {`> ${entry.text}`}
+        </Typography>
+      </Box>
     );
   }
 
   if (entry.kind === "assistant") {
     return (
-      <Typography
-        sx={{
-          color: terminalColors.text,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          mb: 0.5,
-        }}
-      >
-        {entry.text}
-      </Typography>
+      <Box sx={{ mb: 1, pl: 1.25 }}>
+        <Typography
+          sx={{
+            color: terminalColors.text,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {entry.text}
+        </Typography>
+      </Box>
     );
   }
 
@@ -47,7 +55,8 @@ export function Timeline({ entry, step }: TimelineProps) {
           color: terminalColors.gray,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
-          mb: 0.5,
+          mb: 0.75,
+          fontSize: "0.85rem",
         }}
       >
         {entry.text}
@@ -55,24 +64,48 @@ export function Timeline({ entry, step }: TimelineProps) {
     );
   }
 
-  if (entry.kind === "error") {
+  if (entry.kind === "progress") {
     return (
       <Typography
         sx={{
-          color: terminalColors.yellow,
+          color: terminalColors.gray,
+          opacity: 0.85,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           mb: 0.5,
+          fontSize: "0.8rem",
         }}
       >
-        {`error: ${entry.text}`}
+        {`› ${entry.text}`}
       </Typography>
+    );
+  }
+
+  if (entry.kind === "error") {
+    return (
+      <Box
+        sx={{
+          mb: 1,
+          pl: 1.25,
+          borderLeft: `2px solid ${terminalColors.yellow}`,
+        }}
+      >
+        <Typography
+          sx={{
+            color: terminalColors.yellow,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {`error: ${entry.text}`}
+        </Typography>
+      </Box>
     );
   }
 
   if (entry.kind === "step" && step) {
     return (
-      <Box sx={{ mb: 0.5 }}>
+      <Box sx={{ mb: 0.5, pl: 0.5 }}>
         <StepLine step={step} />
       </Box>
     );

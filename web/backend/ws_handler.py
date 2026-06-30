@@ -102,6 +102,11 @@ async def handle_user_message(
 
     await send(serialize_user_echo(cleaned))
 
+    cmd = cleaned.strip().lower().split()[0]
+    if cmd in {"/eval:open", "/eval:axial"}:
+        await _run_eval_slash_command(runtime, cleaned, send)
+        return True
+
     handled, output = handle_slash_command(runtime.workspace, cleaned)
     if handled:
         await _emit_slash_output(runtime, cleaned, output, send)
@@ -114,6 +119,42 @@ async def handle_user_message(
         await _stream_agent_turn(runtime, cleaned, send)
 
     return True
+
+
+async def _run_eval_slash_command(
+    runtime: AgentRuntime,
+    command: str,
+    send: SendFn,
+) -> None:
+    """Run /eval:* in a worker thread so progress can stream over WebSocket."""
+    loop = asyncio.get_running_loop()
+    runtime.progress_relay.bind(loop, send)
+    await send(
+        {
+            "type": "update",
+            "timeline": [],
+            "steps": {},
+            "todos": [],
+            "streaming_assistant": None,
+            "activity_mode": "tool",
+        }
+    )
+
+    try:
+        async with agent_turn_lock:
+            session_manager.activate_session_globals(runtime)
+            _handled, output = await loop.run_in_executor(
+                None,
+                lambda: handle_slash_command(
+                    runtime.workspace,
+                    command,
+                    on_progress=runtime.progress_relay.emit,
+                ),
+            )
+    finally:
+        runtime.progress_relay.unbind()
+
+    await _emit_slash_output(runtime, command, output, send)
 
 
 async def _emit_slash_output(
@@ -157,6 +198,7 @@ async def _stream_agent_turn(
     runtime.interrupt_event = interrupt_event
     inputs = {"messages": [HumanMessage(content=user_text)]}
     consume_task: asyncio.Task | None = None
+    runtime.progress_relay.bind(asyncio.get_running_loop(), send)
 
     async def _consume() -> None:
         async for chunk in runtime.agent.astream(
@@ -186,6 +228,7 @@ async def _stream_agent_turn(
     finally:
         runtime.active_turn = None
         runtime.interrupt_event = None
+        runtime.progress_relay.unbind()
 
     if interrupted or interrupt_event.is_set():
         bundle = get_bundle(runtime.language)

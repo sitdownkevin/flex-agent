@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, Stack, Typography } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
 import {
   createSessionWebSocket,
   sendInterrupt,
   sendMessage,
 } from "../api";
-import { terminalColors } from "../theme";
+import {
+  terminalColors,
+  toolbarButtonSx,
+  toolbarChipSx,
+  toolbarIconButtonSx,
+} from "../theme";
 import type {
   ActivityMode,
   EnvMode,
@@ -28,6 +34,7 @@ interface TerminalProps {
   envMode: EnvMode;
   promptSet: PromptSet;
   onExit: () => void;
+  onOpenSidebar?: () => void;
 }
 
 let lineCounter = 0;
@@ -36,7 +43,13 @@ function nextLineId(prefix: string): string {
   return `${prefix}-${lineCounter}`;
 }
 
-export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProps) {
+export function Terminal({
+  sessionId,
+  envMode,
+  promptSet,
+  onExit,
+  onOpenSidebar,
+}: TerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([]);
   const [steps, setSteps] = useState<Record<string, StepRecord>>({});
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -235,7 +248,12 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
 
   const handleSubmit = () => {
     const text = input.trim();
-    if (!text || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (
+      !text ||
+      busy ||
+      !wsRef.current ||
+      wsRef.current.readyState !== WebSocket.OPEN
+    ) {
       return;
     }
     if (["exit", "quit", "/exit", "/quit"].includes(text.toLowerCase())) {
@@ -266,6 +284,12 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
     }
   };
 
+  const handleInterrupt = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      sendInterrupt(wsRef.current);
+    }
+  };
+
   const activityLabels = i18n?.activity_labels ?? {
     thinking: "Agent 思考中",
     tool: "执行工具",
@@ -290,23 +314,75 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
           bgcolor: terminalColors.panel,
         }}
       >
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Chip
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
+          flexWrap="wrap"
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.75}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ minWidth: 0, flex: 1 }}
+          >
+            {onOpenSidebar && (
+              <IconButton
+                size="small"
+                onClick={onOpenSidebar}
+                aria-label="打开侧边栏"
+                sx={toolbarIconButtonSx}
+              >
+                <MenuIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            )}
+            <Chip
+              size="small"
+              variant="outlined"
+              label={copied ? "已复制" : sessionId}
+              onClick={() => void handleCopySessionId()}
+              sx={{
+                ...toolbarChipSx,
+                fontFamily: "monospace",
+                color: terminalColors.text,
+                cursor: "pointer",
+                maxWidth: { xs: 160, sm: 320 },
+                "&:hover": {
+                  borderColor: terminalColors.cyan,
+                  bgcolor: "rgba(57, 197, 207, 0.08)",
+                },
+                "& .MuiChip-label": {
+                  ...toolbarChipSx["& .MuiChip-label"],
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              }}
+            />
+            <Chip size="small" variant="outlined" label={envMode} sx={toolbarChipSx} />
+            <Chip size="small" variant="outlined" label={promptSet} sx={toolbarChipSx} />
+            {busy && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label="● 推理中"
+                sx={{
+                  ...toolbarChipSx,
+                  color: terminalColors.yellow,
+                  borderColor: "rgba(210, 153, 34, 0.55)",
+                  bgcolor: "rgba(210, 153, 34, 0.06)",
+                }}
+              />
+            )}
+          </Stack>
+          <Button
             size="small"
-            label={copied ? "已复制" : sessionId}
-            onClick={() => void handleCopySessionId()}
-            sx={{
-              height: 24,
-              fontSize: "0.72rem",
-              fontFamily: "monospace",
-              cursor: "pointer",
-              maxWidth: 320,
-              "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
-            }}
-          />
-          <Chip size="small" label={envMode} sx={{ height: 20, fontSize: "0.7rem" }} />
-          <Chip size="small" label={promptSet} sx={{ height: 20, fontSize: "0.7rem" }} />
-          <Button size="small" variant="outlined" onClick={() => setEditorOpen(true)}>
+            variant="outlined"
+            onClick={() => setEditorOpen(true)}
+            sx={toolbarButtonSx}
+          >
             编辑 task_background
           </Button>
         </Stack>
@@ -322,7 +398,7 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
         }}
       >
         {lines.map((line) => {
-          if (line.kind === "banner" || line.kind === "system" || line.kind === "user" || line.kind === "assistant" || line.kind === "error") {
+          if (line.kind === "banner" || line.kind === "system" || line.kind === "user" || line.kind === "assistant" || line.kind === "error" || line.kind === "progress") {
             return (
               <Timeline
                 key={line.id}
@@ -344,10 +420,10 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
           <Todos title={i18n?.plan_title ?? "Plan"} items={todos} />
         )}
 
-        {(streamingText || (busy && activityMode !== "idle")) && (
+        {(streamingText || busy) && (
           <StreamingLine
             text={streamingText}
-            activityMode={activityMode ?? "thinking"}
+            activityMode={activityMode === "idle" && busy ? "thinking" : (activityMode ?? "thinking")}
             activityLabels={activityLabels}
             frameIndex={frameIndex}
           />
@@ -365,6 +441,8 @@ export function Terminal({ sessionId, envMode, promptSet, onExit }: TerminalProp
         onChange={setInput}
         onSubmit={handleSubmit}
         disabled={!connected}
+        busy={busy}
+        onInterrupt={handleInterrupt}
       />
       <TaskBackgroundEditor
         sessionId={sessionId}

@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { Box, Button, Stack, TextField } from "@mui/material";
-import { terminalColors } from "../theme";
+import { Box, Button, CircularProgress, Stack, TextField } from "@mui/material";
+import { terminalColors, toolbarButtonSx } from "../theme";
 
 const SLASH_COMMANDS = [
   "/help",
@@ -17,10 +17,20 @@ interface InputBarProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled?: boolean;
+  busy?: boolean;
+  onInterrupt?: () => void;
 }
 
-export function InputBar({ value, onChange, onSubmit, disabled }: InputBarProps) {
+export function InputBar({
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  busy,
+  onInterrupt,
+}: InputBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputDisabled = disabled || busy;
 
   return (
     <Box
@@ -28,9 +38,11 @@ export function InputBar({ value, onChange, onSubmit, disabled }: InputBarProps)
         borderTop: `1px solid ${terminalColors.border}`,
         bgcolor: terminalColors.panel,
         p: 1.5,
+        opacity: busy ? 0.85 : 1,
+        transition: "opacity 200ms ease",
       }}
     >
-      <Stack direction="row" spacing={1} alignItems="flex-start">
+      <Stack direction="row" spacing={1} alignItems="center">
         <TypographyPrompt />
         <TextField
           inputRef={inputRef}
@@ -39,15 +51,15 @@ export function InputBar({ value, onChange, onSubmit, disabled }: InputBarProps)
           maxRows={6}
           size="small"
           value={value}
-          disabled={disabled}
+          disabled={inputDisabled}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !inputDisabled) {
               event.preventDefault();
               onSubmit();
             }
           }}
-          placeholder="输入 open coding 任务或 slash 命令…"
+          placeholder={busy ? "Agent 推理中，请稍候…" : "输入 open coding 任务或 slash 命令…"}
           variant="standard"
           InputProps={{
             disableUnderline: true,
@@ -58,23 +70,55 @@ export function InputBar({ value, onChange, onSubmit, disabled }: InputBarProps)
             },
           }}
         />
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={disabled}
-          onClick={onSubmit}
-          sx={{ minWidth: 64, borderColor: terminalColors.border }}
-        >
-          发送
-        </Button>
+        {busy ? (
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={onInterrupt}
+            sx={{
+              ...toolbarButtonSx,
+              minWidth: 72,
+              gap: 0.75,
+              color: terminalColors.yellow,
+              borderColor: "rgba(210, 153, 34, 0.55)",
+              "&:hover": {
+                borderColor: terminalColors.yellow,
+                bgcolor: "rgba(210, 153, 34, 0.08)",
+              },
+            }}
+          >
+            <CircularProgress size={14} color="inherit" />
+            停止
+          </Button>
+        ) : (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={disabled}
+            onClick={onSubmit}
+            sx={{ ...toolbarButtonSx, minWidth: 64 }}
+          >
+            发送
+          </Button>
+        )}
       </Stack>
-      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+      <Stack
+        direction="row"
+        spacing={0.5}
+        flexWrap="wrap"
+        useFlexGap
+        sx={{
+          mt: 1,
+          opacity: busy ? 0.5 : 1,
+          transition: "opacity 200ms ease",
+        }}
+      >
         {SLASH_COMMANDS.map((cmd) => (
           <Button
             key={cmd}
             size="small"
             variant="text"
-            disabled={disabled}
+            disabled={inputDisabled}
             onClick={() => {
               onChange(cmd);
               inputRef.current?.focus();

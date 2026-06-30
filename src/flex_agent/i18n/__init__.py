@@ -91,6 +91,11 @@ class ProgressBundle:
     open_coding_skip: str
     open_coding_done: str
     open_coding_summary: str
+    induction_start: str
+    induction_done: str
+    refinement_start: str
+    refinement_batch_skip: str
+    refinement_batch_done: str
     initialized_run: str
     no_texts_to_code: str
     induction_empty_pool: str
@@ -480,6 +485,11 @@ ZH_BUNDLE = TextBundle(
         open_coding_skip="[OpenCoding] 跳过 text_id={text_id} ({done}/{total})",
         open_coding_done="[OpenCoding] 完成 text_id={text_id} ({done}/{total}) · items={items}",
         open_coding_summary="OpenCoding processed {coded}/{total} texts. Skipped={skipped}. Remaining queue={remaining}.",
+        induction_start="[Inducing] 开始归纳 seed pool ({items} 条目)",
+        induction_done="[Inducing] 完成 · dimensions={dimensions}",
+        refinement_start="[Refinement] 开始处理 {total} 个批次",
+        refinement_batch_skip="[Refinement] 跳过 batch {batch} ({done}/{total})",
+        refinement_batch_done="[Refinement] 完成 batch {batch} ({done}/{total}) · dimensions={dimensions}",
         initialized_run="已初始化：处理 {max_nums} 条（源文件 {source_total} 条），seed={codebook}，update={update}。",
         no_texts_to_code="No texts to code.",
         induction_empty_pool="Inducing skipped: empty item pool.",
@@ -714,6 +724,11 @@ EN_BUNDLE = TextBundle(
         open_coding_skip="[OpenCoding] Skipped text_id={text_id} ({done}/{total})",
         open_coding_done="[OpenCoding] Completed text_id={text_id} ({done}/{total}) · items={items}",
         open_coding_summary="OpenCoding processed {coded}/{total} texts. Skipped={skipped}. Remaining queue={remaining}.",
+        induction_start="[Inducing] Starting seed-pool synthesis ({items} items)",
+        induction_done="[Inducing] Complete · dimensions={dimensions}",
+        refinement_start="[Refinement] Starting {total} batch(es)",
+        refinement_batch_skip="[Refinement] Skipped batch {batch} ({done}/{total})",
+        refinement_batch_done="[Refinement] Completed batch {batch} ({done}/{total}) · dimensions={dimensions}",
         initialized_run="Initialized run with {max_nums} texts (source_total={source_total}), seed={codebook}, update={update}.",
         no_texts_to_code="No texts to code.",
         induction_empty_pool="Inducing skipped: empty item pool.",

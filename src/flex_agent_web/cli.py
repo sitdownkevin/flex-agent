@@ -15,9 +15,9 @@ def _ensure_project_root() -> Path:
 
 def main() -> int:
     _ensure_project_root()
-    parser = argparse.ArgumentParser(description="flex-agent Web TUI server")
+    parser = argparse.ArgumentParser(description="CODE: COnstructDevelopmentEngine Web TUI server")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=9876)
     parser.add_argument("--reload", action="store_true")
     args = parser.parse_args()
 

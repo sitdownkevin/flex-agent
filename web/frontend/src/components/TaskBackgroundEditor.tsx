@@ -55,10 +55,10 @@ export function TaskBackgroundEditor({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>编辑 task_background.md</DialogTitle>
+      <DialogTitle>Edit task_background.md</DialogTitle>
       <DialogContent>
         <Alert severity="info" sx={{ mb: 2 }}>
-          保存后会重载当前 session 的 agent，新 prompt 立即生效；workspace 编码状态保留，对话记忆会重置。
+          After saving, the agent will be reloaded, and the new prompt will take effect immediately; the coding status of the workspace will be preserved, and the conversation memory will be reset.
         </Alert>
         {error && (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -73,7 +73,7 @@ export function TaskBackgroundEditor({
           value={content}
           disabled={loading || saving}
           onChange={(event) => setContent(event.target.value)}
-          placeholder={loading ? "加载中…" : ""}
+          placeholder={loading ? "Loading…" : ""}
           InputProps={{
             sx: {
               fontFamily: monoFont,
@@ -85,10 +85,10 @@ export function TaskBackgroundEditor({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={saving}>
-          取消
+          Cancel
         </Button>
         <Button variant="contained" onClick={() => void handleSave()} disabled={loading || saving}>
-          保存
+          Save
         </Button>
       </DialogActions>
     </Dialog>

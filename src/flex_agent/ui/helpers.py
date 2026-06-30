@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Callable
+from collections.abc import Callable
 
 from flex_agent.coding.export import export_open_coding_result
 from flex_agent.eval import evaluate_axial_workspace, evaluate_workspace
@@ -16,6 +16,11 @@ from flex_agent.models import DimensionDetail, SessionMeta
 from flex_agent.workspace import Workspace
 
 SlashHandler = Callable[[], str | None]
+ProgressCallback = Callable[[str], None]
+
+
+def _default_progress(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
 
 
 def format_codebook_tree(dimensions: list[DimensionDetail]) -> str:
@@ -34,11 +39,17 @@ def format_help() -> str:
     return get_bundle().cli.help_text
 
 
-def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str | None]:
+def handle_slash_command(
+    workspace: Workspace,
+    command: str,
+    *,
+    on_progress: ProgressCallback | None = None,
+) -> tuple[bool, str | None]:
     parts = command.strip().split()
     if not parts:
         return False, None
     cmd = parts[0].lower()
+    progress_cb = on_progress if on_progress is not None else _default_progress
     if cmd in {"/help", "help"}:
         return True, format_help()
     if cmd == "/status":
@@ -57,7 +68,7 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
             report = evaluate_workspace(
                 workspace,
                 mode=mode,  # type: ignore[arg-type]
-                on_progress=lambda msg: print(msg, file=sys.stderr, flush=True),
+                on_progress=progress_cb,
             )
         except RuntimeError as exc:
             return True, str(exc)
@@ -75,7 +86,7 @@ def handle_slash_command(workspace: Workspace, command: str) -> tuple[bool, str 
                 workspace,
                 mode=mode,  # type: ignore[arg-type]
                 align=align,
-                on_progress=lambda msg: print(msg, file=sys.stderr, flush=True),
+                on_progress=progress_cb,
             )
         except RuntimeError as exc:
             return True, str(exc)

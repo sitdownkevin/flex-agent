@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Box } from "@mui/material";
+import { Box, Drawer, useMediaQuery, useTheme } from "@mui/material";
 import { deleteSession, getSession } from "./api";
 import { EntryScreen } from "./components/EntryScreen";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, SidebarContent } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
 import {
   listLocalSessions,
@@ -14,9 +14,12 @@ import { terminalColors } from "./theme";
 import type { SessionSummary } from "./types";
 
 export default function App() {
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refreshSessions = useCallback(async () => {
     const localRecords = listLocalSessions();
@@ -83,6 +86,7 @@ export default function App() {
     }
     touchLocalSession(sessionId);
     setActiveSessionId(sessionId);
+    setDrawerOpen(false);
     await refreshSessions();
   };
 
@@ -101,18 +105,47 @@ export default function App() {
 
   const activeSession = sessions.find((item) => item.id === activeSessionId);
 
+  const sidebarProps = {
+    sessions,
+    activeSessionId,
+    onSelect: (sessionId: string) => void handleOpenSession(sessionId),
+    onDelete: handleDelete,
+    onRefresh: refreshSessions,
+    onHome: () => {
+      setActiveSessionId(null);
+      setDrawerOpen(false);
+    },
+  };
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: terminalColors.bg }}>
-      {activeSessionId && (
-        <Sidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelect={(sessionId) => void handleOpenSession(sessionId)}
-          onDelete={handleDelete}
-          onRefresh={refreshSessions}
-          onHome={() => setActiveSessionId(null)}
-        />
+      {activeSessionId && isDesktop && <Sidebar {...sidebarProps} />}
+
+      {activeSessionId && !isDesktop && (
+        <Drawer
+          anchor="left"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          PaperProps={{
+            sx: {
+              width: 280,
+              bgcolor: terminalColors.panel,
+              borderRight: `1px solid ${terminalColors.border}`,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+            }}
+          >
+            <SidebarContent {...sidebarProps} />
+          </Box>
+        </Drawer>
       )}
+
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {activeSessionId ? (
           <Terminal
@@ -121,6 +154,7 @@ export default function App() {
             envMode={activeSession?.env_mode ?? "env"}
             promptSet={activeSession?.prompt_set ?? "baseline"}
             onExit={() => setActiveSessionId(null)}
+            onOpenSidebar={!isDesktop ? () => setDrawerOpen(true) : undefined}
           />
         ) : (
           <EntryScreen

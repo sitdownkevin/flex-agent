@@ -32,9 +32,27 @@ export function StepLine({ step }: StepLineProps) {
           color: COLORS[step.status],
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 0.5,
         }}
       >
-        {`${ICONS[step.status]} ${step.label}${summary}`}
+        <Box
+          component="span"
+          sx={
+            step.status === "running"
+              ? {
+                  display: "inline-block",
+                  animation: "spin 1s linear infinite",
+                }
+              : undefined
+          }
+        >
+          {ICONS[step.status]}
+        </Box>
+        <Box component="span">
+          {`${step.label}${summary}`}
+        </Box>
       </Typography>
       {showPreview && (
         <Typography

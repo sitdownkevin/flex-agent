@@ -20,7 +20,7 @@ export interface CreateSessionParams {
   overrides?: EnvOverrides;
 }
 
-export type TimelineKind = "user" | "assistant" | "step" | "system" | "error";
+export type TimelineKind = "user" | "assistant" | "step" | "system" | "error" | "progress";
 
 export type StepStatus = "running" | "done" | "error";
 

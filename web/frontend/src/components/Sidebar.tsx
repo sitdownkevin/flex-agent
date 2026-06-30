@@ -14,7 +14,7 @@ import { terminalColors } from "../theme";
 import type { SessionSummary } from "../types";
 import { downloadFileUrl, uploadFile } from "../api";
 
-interface SidebarProps {
+export interface SidebarContentProps {
   sessions: SessionSummary[];
   activeSessionId: string | null;
   onSelect: (sessionId: string) => void;
@@ -23,14 +23,14 @@ interface SidebarProps {
   onHome: () => void;
 }
 
-export function Sidebar({
+export function SidebarContent({
   sessions,
   activeSessionId,
   onSelect,
   onDelete,
   onRefresh,
   onHome,
-}: SidebarProps) {
+}: SidebarContentProps) {
   const corpusInputRef = useRef<HTMLInputElement>(null);
   const labelsInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,26 +49,16 @@ export function Sidebar({
   };
 
   return (
-    <Box
-      sx={{
-        width: 280,
-        minWidth: 280,
-        borderRight: `1px solid ${terminalColors.border}`,
-        bgcolor: terminalColors.panel,
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-      }}
-    >
+    <>
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          flex-agent
+          CODE
         </Typography>
         <Typography variant="caption" sx={{ color: terminalColors.gray, display: "block" }}>
-          当前 workspace
+          COnstruct Development Engine
         </Typography>
         <Button size="small" variant="text" sx={{ mt: 1, px: 0 }} onClick={onHome}>
-          回到入口
+          首页
         </Button>
       </Box>
 
@@ -88,45 +78,45 @@ export function Sidebar({
             </Typography>
           ) : (
             sessions.map((session) => (
-            <ListItemButton
-              key={session.id}
-              selected={session.id === activeSessionId}
-              onClick={() => onSelect(session.id)}
-              sx={{
-                borderBottom: `1px solid ${terminalColors.border}`,
-                "&.Mui-selected": {
-                  bgcolor: "rgba(57, 197, 207, 0.12)",
-                },
-              }}
-            >
-              <ListItemText
-                primary={session.id}
-                secondary={
-                  <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                    <Typography variant="caption" sx={{ color: terminalColors.gray }}>
-                      {session.status_summary}
-                    </Typography>
-                    <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
-                      <Chip
-                        size="small"
-                        label={session.env_mode}
-                        sx={{ height: 18, fontSize: "0.65rem" }}
-                      />
-                      <Chip
-                        size="small"
-                        label={session.prompt_set}
-                        sx={{ height: 18, fontSize: "0.65rem" }}
-                      />
-                    </Stack>
-                  </Stack>
-                }
-                primaryTypographyProps={{
-                  fontSize: "0.75rem",
-                  noWrap: true,
+              <ListItemButton
+                key={session.id}
+                selected={session.id === activeSessionId}
+                onClick={() => onSelect(session.id)}
+                sx={{
+                  borderBottom: `1px solid ${terminalColors.border}`,
+                  "&.Mui-selected": {
+                    bgcolor: "rgba(57, 197, 207, 0.12)",
+                  },
                 }}
-                secondaryTypographyProps={{ component: "div" }}
-              />
-            </ListItemButton>
+              >
+                <ListItemText
+                  primary={session.id}
+                  secondary={
+                    <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: terminalColors.gray }}>
+                        {session.status_summary}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                        <Chip
+                          size="small"
+                          label={session.env_mode}
+                          sx={{ height: 18, fontSize: "0.65rem" }}
+                        />
+                        <Chip
+                          size="small"
+                          label={session.prompt_set}
+                          sx={{ height: 18, fontSize: "0.65rem" }}
+                        />
+                      </Stack>
+                    </Stack>
+                  }
+                  primaryTypographyProps={{
+                    fontSize: "0.75rem",
+                    noWrap: true,
+                  }}
+                  secondaryTypographyProps={{ component: "div" }}
+                />
+              </ListItemButton>
             ))
           )}
         </List>
@@ -213,6 +203,24 @@ export function Sidebar({
           </Box>
         </>
       )}
+    </>
+  );
+}
+
+export function Sidebar(props: SidebarContentProps) {
+  return (
+    <Box
+      sx={{
+        width: 280,
+        minWidth: 280,
+        borderRight: `1px solid ${terminalColors.border}`,
+        bgcolor: terminalColors.panel,
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+      }}
+    >
+      <SidebarContent {...props} />
     </Box>
   );
 }

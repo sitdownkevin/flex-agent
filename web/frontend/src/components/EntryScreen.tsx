@@ -25,7 +25,7 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { createSession, getSession, languageForPromptSet } from "../api";
-import { terminalColors } from "../theme";
+import { cardSx, sectionAccentSx, terminalColors } from "../theme";
 import type { EnvMode, PromptSet, SessionDetail, SessionSummary } from "../types";
 
 interface EntryScreenProps {
@@ -36,16 +36,15 @@ interface EntryScreenProps {
 }
 
 const PROMPT_OPTIONS: { value: PromptSet; label: string; hint: string }[] = [
-  { value: "baseline", label: "baseline", hint: "中文默认 prompt 集" },
-  { value: "baseline_en", label: "baseline_en", hint: "英文 prompt 集" },
-  { value: "baseline_oneshot", label: "baseline_oneshot", hint: "中文 one-shot 变体" },
-  { value: "baseline_fewshot", label: "baseline_fewshot", hint: "中文 few-shot 变体" },
+  { value: "baseline", label: "baseline", hint: "Chinese baseline prompt set" },
+  { value: "baseline_en", label: "baseline_en", hint: "English baseline prompt set" },
+  { value: "baseline_oneshot", label: "baseline_oneshot", hint: "Chinese baseline one-shot variant" },
+  { value: "baseline_fewshot", label: "baseline_fewshot", hint: "Chinese baseline few-shot variant" },
 ];
 
-const cardSx = {
-  bgcolor: terminalColors.panel,
-  border: `1px solid ${terminalColors.border}`,
-  borderRadius: 1,
+const sectionTitleSx = {
+  fontWeight: 700,
+  ...sectionAccentSx,
 };
 
 export function EntryScreen({
@@ -136,22 +135,32 @@ export function EntryScreen({
       }}
     >
       <Stack spacing={3} sx={{ width: "100%", maxWidth: 720 }}>
-        <Box sx={{ textAlign: "center", pt: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
-            flex-agent Web TUI
+        <Box sx={{ textAlign: "center", pt: 1, pb: 0.5 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              pb: 1.5,
+              background: `linear-gradient(90deg, transparent, ${terminalColors.cyan}, transparent)`,
+              backgroundSize: "100% 1px",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "bottom",
+            }}
+          >
+            CODE: COnstruct Development Engine
           </Typography>
-          <Typography sx={{ color: terminalColors.gray, mt: 0.75 }}>
-            输入 session_id 恢复 workspace，或创建新的 session
-          </Typography>
-          <Typography sx={{ color: terminalColors.gray, mt: 0.5, fontSize: "0.8rem" }}>
-            仅显示本浏览器最近使用过的 session，不会列出服务器上其他人的 workspace
+          <Typography sx={{ color: terminalColors.gray, mt: 1 }}>
+            输入 session_id 恢复 workspace
+            <br />
+            或创建新的 workspace
           </Typography>
         </Box>
 
         {!loading && recentSessions.length > 0 && (
           <Card sx={cardSx}>
             <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ ...sectionTitleSx, mb: 1 }}>
                 本机最近使用
               </Typography>
               <List dense disablePadding>
@@ -165,6 +174,10 @@ export function EntryScreen({
                       borderRadius: 1,
                       mb: 0.75,
                       px: 1.5,
+                      "&:hover": {
+                        bgcolor: "rgba(57, 197, 207, 0.06)",
+                        "& .copy-btn": { opacity: 1 },
+                      },
                     }}
                   >
                     <ListItemText
@@ -175,9 +188,14 @@ export function EntryScreen({
                     />
                     <Tooltip title="复制 session_id">
                       <IconButton
+                        className="copy-btn"
                         size="small"
                         onClick={(event) => void handleCopySessionId(session.id, event)}
-                        sx={{ mr: 0.5 }}
+                        sx={{
+                          mr: 0.5,
+                          opacity: { xs: 1, sm: 0 },
+                          transition: "opacity 200ms ease",
+                        }}
                       >
                         <ContentCopyIcon sx={{ fontSize: "0.9rem" }} />
                       </IconButton>
@@ -195,7 +213,7 @@ export function EntryScreen({
 
         <Card sx={cardSx}>
           <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ ...sectionTitleSx, mb: 2 }}>
               打开已有 workspace
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
@@ -227,13 +245,22 @@ export function EntryScreen({
           </CardContent>
         </Card>
 
-        <Divider sx={{ borderColor: terminalColors.border, fontSize: "0.8rem" }}>
+        <Divider
+          sx={{
+            borderColor: terminalColors.border,
+            fontSize: "0.75rem",
+            color: terminalColors.gray,
+            "&::before, &::after": {
+              borderColor: terminalColors.border,
+            },
+          }}
+        >
           或
         </Divider>
 
         <Card sx={cardSx}>
           <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ ...sectionTitleSx, mb: 2 }}>
               新建 workspace
             </Typography>
 
@@ -249,12 +276,12 @@ export function EntryScreen({
                 <FormControlLabel
                   value="env"
                   control={<Radio size="small" />}
-                  label="使用服务器 .env"
+                  label="Default Provider"
                 />
                 <FormControlLabel
                   value="byok"
                   control={<Radio size="small" />}
-                  label="BYOK（自带 API Key）"
+                  label="BYOK (Bring Your Own Key)"
                 />
               </RadioGroup>
             </FormControl>
@@ -295,7 +322,7 @@ export function EntryScreen({
                     <TextField
                       fullWidth
                       size="small"
-                      label="OPENAI_MODEL（普通+PRO 共用）"
+                      label="OPENAI_MODEL"
                       placeholder="deepseek-v4-flash"
                       value={model}
                       onChange={(event) => setModel(event.target.value)}
@@ -349,6 +376,11 @@ export function EntryScreen({
               size="large"
               disabled={createLoading}
               onClick={() => void handleCreate()}
+              sx={{
+                height: 44,
+                transition: "transform 100ms ease",
+                "&:active": { transform: "scale(0.98)" },
+              }}
             >
               创建并进入
             </Button>

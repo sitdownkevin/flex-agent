@@ -109,6 +109,17 @@ def serialize_system_message(text: str) -> dict[str, Any]:
     }
 
 
+def serialize_progress_message(text: str) -> dict[str, Any]:
+    return {
+        "type": "update",
+        "timeline": [{"kind": "progress", "text": text, "step_id": None}],
+        "steps": {},
+        "todos": [],
+        "streaming_assistant": None,
+        "activity_mode": None,
+    }
+
+
 def serialize_user_echo(text: str) -> dict[str, Any]:
     return {
         "type": "update",

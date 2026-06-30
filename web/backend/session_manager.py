@@ -5,7 +5,8 @@ import json
 import random
 import shutil
 import threading
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from time import strftime
@@ -25,6 +26,7 @@ from flex_agent.config import (
 from flex_agent.i18n import Language, set_language
 from flex_agent.models import SessionMeta
 from flex_agent.orchestration import create_flex_agent
+from flex_agent.orchestration.tools import create_coding_tool_context
 from flex_agent.ui.events import StreamEventParser
 from flex_agent.workspace import Workspace
 
@@ -39,7 +41,13 @@ from web.backend.env_runtime import (
     validate_create_params,
     workspace_prompts_dir,
 )
-from web.backend.events_serializer import banner_payload, workspace_summary
+from web.backend.events_serializer import (
+    banner_payload,
+    serialize_progress_message,
+    workspace_summary,
+)
+
+SendFn = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 agent_turn_lock = asyncio.Lock()
@@ -118,6 +126,35 @@ def _save_thread_id(workspace: Workspace, thread_id: str) -> None:
     )
 
 
+class ProgressRelay:
+    """Bridge synchronous tool progress callbacks to the WebSocket send coroutine."""
+
+    def __init__(self) -> None:
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._send: SendFn | None = None
+
+    def bind(self, loop: asyncio.AbstractEventLoop, send: SendFn) -> None:
+        self._loop = loop
+        self._send = send
+
+    def unbind(self) -> None:
+        self._loop = None
+        self._send = None
+
+    def emit(self, message: str) -> None:
+        loop = self._loop
+        send = self._send
+        if loop is None or send is None or loop.is_closed():
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(
+                send(serialize_progress_message(message)),
+                loop,
+            )
+        except RuntimeError:
+            pass
+
+
 @dataclass
 class AgentRuntime:
     session_id: str
@@ -132,6 +169,7 @@ class AgentRuntime:
     config: dict[str, Any]
     active_turn: asyncio.Task | None = field(default=None, repr=False)
     interrupt_event: asyncio.Event | None = field(default=None, repr=False)
+    progress_relay: ProgressRelay = field(default_factory=ProgressRelay, repr=False)
 
 
 @dataclass
@@ -383,15 +421,23 @@ class SessionManager:
         env_mode: str,
     ) -> AgentRuntime:
         env_json = load_env_json(workspace)
+        progress_relay = ProgressRelay()
         with _runtime_build_lock:
             snapshot = apply_workspace_env(env_json)
             try:
                 clear_llm_cache()
                 self.activate_session_globals_for(language, prompts_dir, workspace)
+                tool_ctx = create_coding_tool_context(
+                    workspace,
+                    prompts_dir=prompts_dir,
+                    language=language,
+                )
+                tool_ctx = replace(tool_ctx, on_progress=progress_relay.emit)
                 agent = create_flex_agent(
                     workspace,
                     prompts_dir=prompts_dir,
                     language=language,
+                    tool_ctx=tool_ctx,
                 )
             finally:
                 restore_env(snapshot)
@@ -418,6 +464,7 @@ class SessionManager:
             parser=StreamEventParser(),
             thread_id=thread_id,
             config=config,
+            progress_relay=progress_relay,
         )
 
     @staticmethod

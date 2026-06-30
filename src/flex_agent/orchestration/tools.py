@@ -199,6 +199,10 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
     bundle = get_bundle(ctx.language)
     progress = bundle.progress
 
+    def _emit(message: str) -> None:
+        if ctx.on_progress is not None:
+            ctx.on_progress(message)
+
     def _logged_tool(tool_name: str, coroutine):
         async def wrapped(**kwargs):
             # region agent log
@@ -299,10 +303,6 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         coded = 0
         skipped: list[int] = []
 
-        def _emit(message: str) -> None:
-            if ctx.on_progress is not None:
-                ctx.on_progress(message)
-
         _emit(progress.open_coding_start.format(total=total, limit=limit))
 
         async def _record_skip(text_id: int, *, note: str | None = None) -> None:
@@ -385,9 +385,11 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         items_pool = extract_item_pool(finished)
         if not items_pool:
             encode_dimensions(ctx.workspace, [])
+            _emit(progress.induction_empty_pool)
             return progress.induction_empty_pool
 
         items_details = extract_item_details(finished)
+        _emit(progress.induction_start.format(items=len(items_pool)))
         try:
             induction_output = await arun_induction(
                 ctx.llm_pro,
@@ -412,6 +414,7 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         reviewed, review_warnings = verify_dimensions(candidate, finished)
         encode_dimensions(ctx.workspace, reviewed)
         ctx.workspace.merge_warnings(review_warnings.as_dict())
+        _emit(progress.induction_done.format(dimensions=len(reviewed)))
         return progress.induction_written.format(count=len(reviewed))
 
     async def run_alice_codebook() -> str:
@@ -446,11 +449,21 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
         current = ctx.workspace.load_dimensions()
         node_warnings = QualityWarnings()
         processed = 0
+        total_batches = len(batches)
+
+        _emit(progress.refinement_start.format(total=total_batches))
 
         for offset, batch_ids in enumerate(batches, start=start_idx):
             batch_finished = [id_to_finished[text_id] for text_id in batch_ids]
             items_pool = extract_item_pool(batch_finished)
             if not items_pool:
+                _emit(
+                    progress.refinement_batch_skip.format(
+                        batch=offset,
+                        done=processed,
+                        total=total_batches,
+                    )
+                )
                 continue
             items_details = extract_item_details(batch_finished)
             try:
@@ -463,6 +476,13 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 )
             except Exception as exc:
                 node_warnings.notes.append(f"AxialCoding batch {offset} skipped: {exc!r}")
+                _emit(
+                    progress.refinement_batch_skip.format(
+                        batch=offset,
+                        done=processed,
+                        total=total_batches,
+                    )
+                )
                 continue
 
             candidate = [
@@ -477,6 +497,14 @@ def build_coding_tools(ctx: CodingToolContext) -> list[StructuredTool]:
                 encode_dimensions(ctx.workspace, current)
                 encode_codebook_batch(ctx.workspace, offset, current)
                 processed += 1
+                _emit(
+                    progress.refinement_batch_done.format(
+                        batch=offset,
+                        done=processed,
+                        total=total_batches,
+                        dimensions=len(current),
+                    )
+                )
 
         final_reviewed, final_warnings = verify_dimensions(
             current,
