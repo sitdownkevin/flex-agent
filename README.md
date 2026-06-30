@@ -86,3 +86,46 @@ cd web/frontend && npm run dev
 - Put nginx (or similar) in front for HTTPS; optional basic auth for production.
 - **Concurrency:** agent turns and slash commands are serialized globally (one at a time across all sessions) because the existing CLI uses module-level language/workspace globals. File upload, download, and session listing are not serialized.
 - **Memory:** workspace files persist across server restarts; in-process LangGraph conversation memory does not. After restart, the agent can continue from saved coding/codebook state via tools like `workspace_status`.
+
+## Docker Compose deployment
+
+A single-container deployment is provided. The image builds the frontend and serves both the static assets and the FastAPI/WebSocket backend on port 8000.
+
+### Quick start
+
+```bash
+cp env.example .env
+# edit .env: set OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_MODEL_PRO
+
+docker compose up -d --build
+curl http://localhost:9876/api/health
+```
+
+Open `http://localhost:9876`.
+
+- Workspace data (including `.checkpoints.sqlite` conversation history) is persisted in the `flex-agent-workspaces` volume.
+- `.env` is injected via `env_file`; BYOK sessions store their own overrides under `workspaces/<id>/meta/env.json`.
+- Change the host port via `FLEX_AGENT_PORT` (defaults to 9876):
+  ```bash
+  FLEX_AGENT_PORT=8080 docker compose up -d
+  ```
+
+### Update to a new version
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Existing workspace data in the volume is preserved.
+
+### Bind-mount workspaces to the host
+
+To inspect or back up workspace files directly on the host, replace the named volume with a bind mount in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ./workspaces:/app/workspaces
+```
+
+The CLI (`uv run agent`) is unaffected by Docker deployment and remains available on the host.
