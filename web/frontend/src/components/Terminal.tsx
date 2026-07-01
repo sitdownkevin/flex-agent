@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Button, Chip, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   createSessionWebSocket,
@@ -41,6 +42,7 @@ interface TerminalProps {
   presence: PresenceStats;
   onExit: () => void;
   onOpenSidebar?: () => void;
+  shareMode?: boolean;
 }
 
 let lineCounter = 0;
@@ -56,6 +58,7 @@ export function Terminal({
   presence,
   onExit,
   onOpenSidebar,
+  shareMode,
 }: TerminalProps) {
   const { t } = useI18n();
   const [lines, setLines] = useState<TerminalLine[]>([]);
@@ -72,6 +75,7 @@ export function Terminal({
   const [editorOpen, setEditorOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const lastWorkspaceSummaryRef = useRef<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -250,6 +254,7 @@ export function Terminal({
   }, [lines, streamingText, todos, busy, activityMode]);
 
   useEffect(() => {
+    if (shareMode) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && wsRef.current?.readyState === WebSocket.OPEN) {
         sendInterrupt(wsRef.current);
@@ -257,7 +262,7 @@ export function Terminal({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [shareMode]);
 
   const handleSubmit = () => {
     const text = input.trim();
@@ -292,6 +297,16 @@ export function Terminal({
       await navigator.clipboard.writeText(sessionId);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/share/${sessionId}`);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1500);
     } catch {
       // ignore clipboard errors
     }
@@ -334,85 +349,99 @@ export function Terminal({
           gap={1}
           flexWrap="wrap"
         >
-          <Stack
-            direction="row"
-            alignItems="center"
-            gap={0.75}
-            flexWrap="wrap"
-            useFlexGap
-            sx={{ minWidth: 0, flex: 1 }}
-          >
-            {onOpenSidebar && (
-              <IconButton
-                size="small"
-                onClick={onOpenSidebar}
-                aria-label={t("terminal.openSidebar")}
-                sx={toolbarIconButtonSx}
-              >
-                <MenuIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            )}
-            <Chip
-              size="small"
-              variant="outlined"
-              label={copied ? t("terminal.copied") : sessionId}
-              onClick={() => void handleCopySessionId()}
-              sx={{
-                ...toolbarChipSx,
-                fontFamily: "monospace",
-                color: terminalColors.text,
-                cursor: "pointer",
-                maxWidth: { xs: 160, sm: 320 },
-                "&:hover": {
-                  borderColor: terminalColors.cyan,
-                  bgcolor: "rgba(57, 197, 207, 0.08)",
-                },
-                "& .MuiChip-label": {
-                  ...toolbarChipSx["& .MuiChip-label"],
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                },
-              }}
-            />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={envMode}
-              sx={{ ...toolbarChipSx, display: { xs: "none", sm: "inline-flex" } }}
-            />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={promptSet}
-              sx={{ ...toolbarChipSx, display: { xs: "none", sm: "inline-flex" } }}
-            />
-            {busy && (
+          {!shareMode && (
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={0.75}
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ minWidth: 0, flex: 1 }}
+            >
+              {onOpenSidebar && (
+                <IconButton
+                  size="small"
+                  onClick={onOpenSidebar}
+                  aria-label={t("terminal.openSidebar")}
+                  sx={toolbarIconButtonSx}
+                >
+                  <MenuIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              )}
               <Chip
                 size="small"
                 variant="outlined"
-                label={t("terminal.reasoning")}
+                label={copied ? t("terminal.copied") : sessionId}
+                onClick={() => void handleCopySessionId()}
                 sx={{
                   ...toolbarChipSx,
-                  color: terminalColors.yellow,
-                  borderColor: "rgba(210, 153, 34, 0.55)",
-                  bgcolor: "rgba(210, 153, 34, 0.06)",
+                  fontFamily: "monospace",
+                  color: terminalColors.text,
+                  cursor: "pointer",
+                  maxWidth: { xs: 160, sm: 320 },
+                  "&:hover": {
+                    borderColor: terminalColors.cyan,
+                    bgcolor: "rgba(57, 197, 207, 0.08)",
+                  },
+                  "& .MuiChip-label": {
+                    ...toolbarChipSx["& .MuiChip-label"],
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  },
                 }}
               />
-            )}
-            <Chip
-              size="small"
-              variant="outlined"
-              label={t("terminal.onlineSessions", { sessions: presence.online_sessions })}
-              sx={{
-                ...toolbarChipSx,
-                color: terminalColors.green,
-                borderColor: "rgba(63, 185, 80, 0.45)",
-                bgcolor: "rgba(63, 185, 80, 0.06)",
-                display: { xs: "none", sm: "inline-flex" },
-              }}
-            />
-          </Stack>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={envMode}
+                sx={{ ...toolbarChipSx, display: { xs: "none", sm: "inline-flex" } }}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={promptSet}
+                sx={{ ...toolbarChipSx, display: { xs: "none", sm: "inline-flex" } }}
+              />
+              {busy && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={t("terminal.reasoning")}
+                  sx={{
+                    ...toolbarChipSx,
+                    color: terminalColors.yellow,
+                    borderColor: "rgba(210, 153, 34, 0.55)",
+                    bgcolor: "rgba(210, 153, 34, 0.06)",
+                  }}
+                />
+              )}
+              <Chip
+                size="small"
+                variant="outlined"
+                label={t("terminal.onlineSessions", { sessions: presence.online_sessions })}
+                sx={{
+                  ...toolbarChipSx,
+                  color: terminalColors.green,
+                  borderColor: "rgba(63, 185, 80, 0.45)",
+                  bgcolor: "rgba(63, 185, 80, 0.06)",
+                  display: { xs: "none", sm: "inline-flex" },
+                }}
+              />
+            </Stack>
+          )}
           <Stack direction="row" spacing={0.75} sx={{ display: { xs: "flex", sm: "none" } }}>
+            {!shareMode && (
+              <Tooltip title={t("terminal.shareTooltip")} arrow>
+                <IconButton
+                  size="small"
+                  aria-label={t("terminal.shareTooltip")}
+                  onClick={() => void handleShare()}
+                  sx={toolbarIconButtonSx}
+                >
+                  <ShareOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            )}
             <IconButton
               size="small"
               aria-label={t("terminal.view")}
@@ -431,6 +460,19 @@ export function Terminal({
             </IconButton>
           </Stack>
           <Stack direction="row" spacing={0.75} sx={{ display: { xs: "none", sm: "flex" } }}>
+            {!shareMode && (
+              <Tooltip title={shareCopied ? t("terminal.shareCopied") : t("terminal.shareTooltip")} arrow>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => void handleShare()}
+                  sx={toolbarButtonSx}
+                >
+                  <ShareOutlinedIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                  {t("terminal.shareTooltip")}
+                </Button>
+              </Tooltip>
+            )}
             <Button
               size="small"
               variant="outlined"
@@ -499,19 +541,22 @@ export function Terminal({
         )}
       </Box>
 
-      <InputBar
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSubmit}
-        disabled={!connected}
-        busy={busy}
-        onInterrupt={handleInterrupt}
-      />
+      {!shareMode && (
+        <InputBar
+          value={input}
+          onChange={setInput}
+          onSubmit={handleSubmit}
+          disabled={!connected}
+          busy={busy}
+          onInterrupt={handleInterrupt}
+        />
+      )}
       <WorkspaceEditor
         sessionId={sessionId}
         envMode={envMode}
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
+        readOnly={shareMode}
       />
       <WorkspaceViewer
         sessionId={sessionId}

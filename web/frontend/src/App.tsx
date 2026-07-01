@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Box, Drawer, Snackbar, Alert, useMediaQuery, useTheme } from "@mui/material";
 import { deleteSession, getSession } from "./api";
 import { EntryScreen } from "./components/EntryScreen";
+import { ShareScreen } from "./components/ShareScreen";
 import { Sidebar, SidebarContent } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
 import { useI18n } from "./i18n/LanguageContext";
@@ -19,6 +20,10 @@ export default function App() {
   const { t } = useI18n();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
+  const shareMatch = window.location.pathname.match(/^\/share\/(.+)$/);
+  const shareSessionId = shareMatch?.[1] ?? null;
+
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,6 +131,14 @@ export default function App() {
       setDrawerOpen(false);
     },
   };
+
+  if (shareSessionId) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: terminalColors.bg }}>
+        <ShareScreen sessionId={shareSessionId} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: terminalColors.bg }}>

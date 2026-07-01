@@ -276,6 +276,11 @@ def create_app() -> FastAPI:
             await presence_manager.unregister_session(session_id, presence_conn_id)
 
     if FRONTEND_DIST.exists():
+        # SPA fallback for /share/* paths so the frontend router can handle them
+        @app.get("/share/{full_path:path}")
+        def spa_share(full_path: str) -> FileResponse:
+            return FileResponse(str(FRONTEND_DIST / "index.html"))
+
         app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
     else:
 

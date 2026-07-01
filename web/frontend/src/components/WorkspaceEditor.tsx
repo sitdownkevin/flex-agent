@@ -41,6 +41,7 @@ interface WorkspaceEditorProps {
   envMode: EnvMode;
   open: boolean;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -65,6 +66,7 @@ interface EditableFileTabProps {
   downloadUrl?: string;
   savedLabel?: string;
   onStatusChange: (status: TabSaveStatus) => void;
+  readOnly?: boolean;
 }
 
 const EditableFileTab = forwardRef<EditableFileTabHandle, EditableFileTabProps>(
@@ -78,6 +80,7 @@ const EditableFileTab = forwardRef<EditableFileTabHandle, EditableFileTabProps>(
       downloadUrl,
       savedLabel,
       onStatusChange,
+      readOnly,
     },
     ref,
   ) {
@@ -228,11 +231,12 @@ const EditableFileTab = forwardRef<EditableFileTabHandle, EditableFileTabProps>(
           maxRows={24}
           value={content}
           disabled={loading}
+          readOnly={readOnly}
           onChange={(event) => {
             const next = event.target.value;
             setContent(next);
             contentRef.current = next;
-            scheduleSave(next);
+            if (!readOnly) scheduleSave(next);
           }}
           placeholder={loading ? t("editor.loading") : ""}
           InputProps={{
@@ -251,7 +255,7 @@ const EditableFileTab = forwardRef<EditableFileTabHandle, EditableFileTabProps>(
             opacity: 0.7,
           }}
         >
-          {savedLabel}
+          {readOnly ? "" : savedLabel}
         </Typography>
       </Box>
     );
@@ -269,7 +273,7 @@ interface EditorTab {
   byok?: boolean;
 }
 
-function buildTabs(t: TFunction, envMode: EnvMode): EditorTab[] {
+function buildTabs(t: TFunction, envMode: EnvMode, readOnly?: boolean): EditorTab[] {
   const fileTabs: EditorTab[] = [
     {
       label: "task_background.md",
@@ -306,7 +310,7 @@ function buildTabs(t: TFunction, envMode: EnvMode): EditorTab[] {
       savedLabel: t("editor.savedReload"),
     },
   ];
-  if (envMode === "byok") {
+  if (envMode === "byok" && !readOnly) {
     fileTabs.push({
       label: t("editor.byokTab"),
       loadPath: "prompts/task_background.md",
@@ -500,9 +504,9 @@ function ByokTab({ sessionId, open, isActive }: ByokTabProps) {
   );
 }
 
-export function WorkspaceEditor({ sessionId, envMode, open, onClose }: WorkspaceEditorProps) {
+export function WorkspaceEditor({ sessionId, envMode, open, onClose, readOnly }: WorkspaceEditorProps) {
   const { t } = useI18n();
-  const tabs = buildTabs(t, envMode);
+  const tabs = buildTabs(t, envMode, readOnly);
   const [tabIndex, setTabIndex] = useState(0);
   const [tabStatus, setTabStatus] = useState<TabSaveStatus>({
     saveState: "idle",
@@ -573,13 +577,15 @@ export function WorkspaceEditor({ sessionId, envMode, open, onClose }: Workspace
           {tabStatus.saveState === "saving" && (
             <CircularProgress size={12} sx={{ color: statusColor }} />
           )}
-          <span>{statusLabel}</span>
+          <span>{readOnly ? t("editor.readOnly") : statusLabel}</span>
         </Box>
       </DialogTitle>
       <DialogContent>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          {t("editor.alert", { ms: AUTOSAVE_DELAY_MS })}
-        </Alert>
+        {!readOnly && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t("editor.alert", { ms: AUTOSAVE_DELAY_MS })}
+          </Alert>
+        )}
         <Tabs
           value={tabIndex}
           onChange={(_, next) => void handleTabChange(_, next)}
@@ -624,19 +630,22 @@ export function WorkspaceEditor({ sessionId, envMode, open, onClose }: Workspace
                 tab.downloadKind ? downloadFileUrl(sessionId, tab.downloadKind) : undefined
               }
               onStatusChange={tabIndex === index ? setTabStatus : () => {}}
+              readOnly={readOnly}
             />
           );
         })}
-        <Typography
-          sx={{
-            mt: 1,
-            fontSize: fontSizes.sm,
-            color: terminalColors.gray,
-            opacity: 0.7,
-          }}
-        >
-          {t("editor.hintSwitch")}
-        </Typography>
+        {!readOnly && (
+          <Typography
+            sx={{
+              mt: 1,
+              fontSize: fontSizes.sm,
+              color: terminalColors.gray,
+              opacity: 0.7,
+            }}
+          >
+            {t("editor.hintSwitch")}
+          </Typography>
+        )}
       </DialogContent>
     </Dialog>
   );

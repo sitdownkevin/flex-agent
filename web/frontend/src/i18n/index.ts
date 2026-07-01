@@ -59,6 +59,8 @@ export const translations: Record<UiLang, Record<string, string>> = {
     "terminal.view": "查看",
     "terminal.edit": "编辑",
     "terminal.connecting": "连接中…",
+    "terminal.shareTooltip": "复制分享链接",
+    "terminal.shareCopied": "已复制分享链接",
 
     // InputBar
     "input.placeholderBusy": "Agent 推理中，请稍候…",
@@ -87,6 +89,7 @@ export const translations: Record<UiLang, Record<string, string>> = {
     "editor.byokSaved": "已保存 · agent 已重载",
     "editor.byokSaveFailed": "保存失败",
     "editor.byokLoadFailed": "加载失败",
+    "editor.readOnly": "只读",
 
     // WorkspaceViewer
     "viewer.title": "查看工作区",
@@ -136,6 +139,11 @@ export const translations: Record<UiLang, Record<string, string>> = {
     // App
     "app.deleteFailed": "删除工作区失败",
     "app.statusSummary": "texts={texts} · coded={coded} · queue={queue} · dimensions={dimensions}",
+
+    // ShareScreen
+    "share.loading": "加载中…",
+    "share.notFound": "工作区不存在或无法访问",
+    "share.backHome": "返回首页",
   },
   en: {
     // EntryScreen
@@ -186,6 +194,8 @@ export const translations: Record<UiLang, Record<string, string>> = {
     "terminal.view": "View",
     "terminal.edit": "Edit",
     "terminal.connecting": "Connecting…",
+    "terminal.shareTooltip": "Copy share link",
+    "terminal.shareCopied": "Share link copied",
 
     // InputBar
     "input.placeholderBusy": "Agent is reasoning, please wait…",
@@ -214,6 +224,7 @@ export const translations: Record<UiLang, Record<string, string>> = {
     "editor.byokSaved": "Saved · agent reloaded",
     "editor.byokSaveFailed": "Save failed",
     "editor.byokLoadFailed": "Failed to load",
+    "editor.readOnly": "Read-only",
 
     // WorkspaceViewer
     "viewer.title": "View workspace",
@@ -261,6 +272,11 @@ export const translations: Record<UiLang, Record<string, string>> = {
     // App
     "app.deleteFailed": "Failed to delete session",
     "app.statusSummary": "texts={texts} · coded={coded} · queue={queue} · dimensions={dimensions}",
+
+    // ShareScreen
+    "share.loading": "Loading…",
+    "share.notFound": "Session not found or inaccessible",
+    "share.backHome": "Back to home",
   },
 };
 
