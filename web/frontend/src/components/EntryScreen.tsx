@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Collapse,
   Divider,
   FormControl,
   FormControlLabel,
@@ -26,6 +27,8 @@ import {
   Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -55,7 +58,8 @@ const ALL_PROMPT_OPTIONS: { value: PromptSet; lang: UiLang; hintKey: string }[] 
 ];
 
 const sectionTitleSx = {
-  fontWeight: 700,
+  fontFamily: '"Instrument Serif", serif',
+  fontWeight: 400,
   fontSize: fontSizes.lg,
   ...sectionAccentSx,
 };
@@ -72,6 +76,7 @@ export function EntryScreen({
   const [openId, setOpenId] = useState("");
   const [openError, setOpenError] = useState<string | null>(null);
   const [openLoading, setOpenLoading] = useState(false);
+  const [recentCollapsed, setRecentCollapsed] = useState(true);
 
   const [mode, setMode] = useState<EnvMode>("env");
   const promptOptions = useMemo(
@@ -158,26 +163,28 @@ export function EntryScreen({
     >
       <Stack spacing={3} sx={{ width: "100%", maxWidth: 720 }}>
         <Box sx={{ textAlign: "center", pt: 1, pb: 0.5 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontFamily: '"Instrument Serif", serif',
+              fontWeight: 400,
+              letterSpacing: 0,
+              pb: 1.5,
+              background: `linear-gradient(90deg, transparent, ${terminalColors.cyan}, transparent)`,
+              backgroundSize: "100% 1px",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "bottom",
+            }}
+          >
+            {t("entry.brandTitle")}
+          </Typography>
           <Stack
             direction="row"
             alignItems="center"
             justifyContent="center"
             gap={1.5}
-            sx={{ pb: 1.5 }}
+            sx={{ pb: 0.5 }}
           >
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                background: `linear-gradient(90deg, transparent, ${terminalColors.cyan}, transparent)`,
-                backgroundSize: "100% 1px",
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "bottom",
-              }}
-            >
-              {t("entry.brandTitle")}
-            </Typography>
             <Tooltip title={t("entry.githubTooltip")} arrow>
               <IconButton
                 component="a"
@@ -192,14 +199,6 @@ export function EntryScreen({
                 <GitHubIcon />
               </IconButton>
             </Tooltip>
-          </Stack>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="center"
-            gap={1.5}
-            sx={{ pb: 0.5 }}
-          >
             <Chip
               size="small"
               variant="outlined"
@@ -257,60 +256,6 @@ export function EntryScreen({
             </ToggleButtonGroup>
           </Stack>
         </Box>
-
-        {!loading && recentSessions.length > 0 && (
-          <Card sx={cardSx}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <Typography sx={{ ...sectionTitleSx, mb: 1 }}>
-                {t("entry.recentTitle")}
-              </Typography>
-              <List dense disablePadding>
-                {recentSessions.map((session) => (
-                  <ListItemButton
-                    key={session.id}
-                    onClick={() => void handleOpen(session.id)}
-                    disabled={openLoading}
-                    sx={{
-                      border: `1px solid ${terminalColors.border}`,
-                      borderRadius: 1,
-                      mb: 0.75,
-                      px: 1.5,
-                      "&:hover": {
-                        bgcolor: "rgba(57, 197, 207, 0.06)",
-                        "& .copy-btn": { opacity: 1 },
-                      },
-                    }}
-                  >
-                    <ListItemText
-                      primary={session.id}
-                      secondary={session.status_summary}
-                      primaryTypographyProps={{ fontSize: fontSizes.md, fontWeight: 600 }}
-                      secondaryTypographyProps={{ fontSize: fontSizes.sm, color: terminalColors.gray }}
-                    />
-                    <Tooltip title={t("entry.copyTooltip")}>
-                      <IconButton
-                        className="copy-btn"
-                        size="small"
-                        onClick={(event) => void handleCopySessionId(session.id, event)}
-                        sx={{
-                          mr: 0.5,
-                          opacity: { xs: 1, sm: 0 },
-                          transition: "opacity 200ms ease",
-                        }}
-                      >
-                        <ContentCopyIcon sx={{ fontSize: "0.9rem" }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Stack direction="row" spacing={0.5}>
-                      <Chip label={session.env_mode} size="small" sx={{ height: 20, fontSize: fontSizes.xs }} />
-                      <Chip label={session.prompt_set} size="small" sx={{ height: 20, fontSize: fontSizes.xs }} />
-                    </Stack>
-                  </ListItemButton>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        )}
 
         <Card sx={cardSx}>
           <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
@@ -476,6 +421,79 @@ export function EntryScreen({
             )}
           </CardContent>
         </Card>
+
+        {!loading && recentSessions.length > 0 && (
+          <Card sx={cardSx}>
+            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: recentCollapsed ? 0 : 1 }}
+              >
+                <Typography sx={sectionTitleSx}>{t("entry.recentTitle")}</Typography>
+                <Tooltip
+                  title={t(recentCollapsed ? "entry.recentExpandTooltip" : "entry.recentCollapseTooltip")}
+                  arrow
+                >
+                  <IconButton
+                    size="small"
+                    onClick={() => setRecentCollapsed((prev) => !prev)}
+                    sx={{ color: terminalColors.gray, "&:hover": { color: terminalColors.text } }}
+                  >
+                    {recentCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              <Collapse in={!recentCollapsed}>
+                <List dense disablePadding>
+                  {recentSessions.map((session) => (
+                    <ListItemButton
+                      key={session.id}
+                      onClick={() => void handleOpen(session.id)}
+                      disabled={openLoading}
+                      sx={{
+                        border: `1px solid ${terminalColors.border}`,
+                        borderRadius: 1,
+                        mb: 0.75,
+                        px: 1.5,
+                        "&:hover": {
+                          bgcolor: "rgba(57, 197, 207, 0.06)",
+                          "& .copy-btn": { opacity: 1 },
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={session.id}
+                        secondary={session.status_summary}
+                        primaryTypographyProps={{ fontSize: fontSizes.md, fontWeight: 600 }}
+                        secondaryTypographyProps={{ fontSize: fontSizes.sm, color: terminalColors.gray }}
+                      />
+                      <Tooltip title={t("entry.copyTooltip")}>
+                        <IconButton
+                          className="copy-btn"
+                          size="small"
+                          onClick={(event) => void handleCopySessionId(session.id, event)}
+                          sx={{
+                            mr: 0.5,
+                            opacity: { xs: 1, sm: 0 },
+                            transition: "opacity 200ms ease",
+                          }}
+                        >
+                          <ContentCopyIcon sx={{ fontSize: "0.9rem" }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Stack direction="row" spacing={0.5}>
+                        <Chip label={session.env_mode} size="small" sx={{ height: 20, fontSize: fontSizes.xs }} />
+                        <Chip label={session.prompt_set} size="small" sx={{ height: 20, fontSize: fontSizes.xs }} />
+                      </Stack>
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Collapse>
+            </CardContent>
+          </Card>
+        )}
       </Stack>
     </Box>
   );

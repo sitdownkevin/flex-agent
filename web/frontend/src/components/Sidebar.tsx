@@ -44,7 +44,10 @@ export function SidebarContent({
     <>
       <Box sx={{ p: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography
+            variant="h6"
+            sx={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, mb: 0.5 }}
+          >
             CODE
           </Typography>
           <Tooltip title={t("sidebar.githubTooltip")} arrow>
